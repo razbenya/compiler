@@ -1,3 +1,3 @@
-(define x 1)
-(define y 'test)
-(if (eq? y 'test) x y)
+(define x '(1 2 3 4))
+(define y 3)
+(if (eq? y 4) x y)
