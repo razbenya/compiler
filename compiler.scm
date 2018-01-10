@@ -155,7 +155,7 @@
              (get-asm-const-table (car ctable))))
           	
           
-          	(asm-output (format "%include \"scheme.s\"\nsection .bss \nglobal _main\nsection .rodata\n\t~A\nsection .data\n\t_main:\n" asm-ctable)))
+          	(asm-output (format "%include \"scheme.s\"\nsection .bss \nglobal main\nsection .rodata\n\t~A\nsection .data\n\tmain:\n" asm-ctable)))
   			
      		 (string->file asm-output out)
         		asm-output
