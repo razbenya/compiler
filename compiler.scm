@@ -127,7 +127,7 @@
       (lambda (table lst addr)
        (if (null? lst) `(,table ,addr)
         (let ((type (get-const-type (car lst) table)))
-            (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (+ addr (length type))))))))
+            (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (+ addr 8)))))))
       (iter '() const-lst 0))))
 
 
