@@ -27,6 +27,14 @@
 							(cons ch (run)))))))
 			(run)))))
 
+(define string->file
+  (lambda (str out)
+     (begin 
+     (delete-file out)
+        (let* ((out-port (open-output-file out)))
+            (begin (for-each (lambda(ch) (write-char ch out-port)) (string->list str)) 
+        (close-output-port out-port))))))
+
 (define list->set 
   (lambda (s) 
     (fold-right
@@ -103,11 +111,13 @@
   (lambda (val table)
     (cond 
        ((integer? val)  `("T_INTEGER" ,val))
-       ((equal? val (void)) `("T_VOID"))
-       ((null? val) `("T_NIL")) 
+       ((equal? val (void)) `("T_VOID" ,0))
+       ((null? val) `("T_NIL" ,0)) 
        ((boolean? val) `("T_BOOL" ,(if val 1 0)))
        ((char? val) `("T_CHAR" ,(char->integer val)))
-       ((string? val) `("T_STRING" todo))
+       ;((string? val) `("T_STRING" todo))
+       ;((vector? val ))
+       ;((fraction? val ))
        ((pair? val) `("T_PAIR" ,(lookup-const (car val) table) ,(lookup-const (cdr val) table))))
     ))
 
@@ -118,18 +128,38 @@
        (if (null? lst) `(,table ,addr)
         (let ((type (get-const-type (car lst) table)))
             (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (+ addr (length type))))))))
-      (iter '() const-lst 1))))
+      (iter '() const-lst 0))))
 
 
+(define get-asm-const-line
+  (lambda (table-line)
+    (let* ((value (caddr table-line))
+           (type (car value)))
+      (cond 
+        ((or (equal? type "T_INTEGER") (equal? type "T_NIL") (equal? type "T_VOID") (equal? type "T_BOOL"))
+            (format "dq MAKE_LITERAL(~A,~S)\n" type (cadr value)))
+      (else "WTF"))
+    )))
 
+(define get-asm-const-table
+  (lambda (table)
+    (if (null? table) ""
+    (string-append (get-asm-const-line (car table)) (get-asm-const-table (cdr table))))))
 
 (define compile-scheme-file 
   (lambda (in out)
-    (let ((lst-exprs (pipeline (file->list in))))
-    	(make-const-table (get-consts lst-exprs))
-    )))
-             
-             
-
+    (let* ((lst-exprs (pipeline (file->list in)))
+    	   (ctable (make-const-table (get-consts lst-exprs)))
+      	   (asm-ctable (string-append 
+            "const_table:\n" 
+             (get-asm-const-table (car ctable))))
+          	
+          
+          	(asm-output (format "%include \"scheme.s\"\nsection .bss \nglobal _start\nsection .rodata\n\t~A\nsection .data\n\t_start:\n" asm-ctable)))
+  			
+     		 (string->file asm-output out)
+        		asm-output
+         )))
     
+ 
              
