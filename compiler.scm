@@ -2,6 +2,7 @@
 (load "tag-parser.scm")
 (load "semantic-analyzer.scm")
  
+ ;Function to run assignment 1-3 on input
  (define pipeline
 	(lambda (s)
 		((star <sexpr>) s
@@ -14,6 +15,7 @@
 				m))
 			(lambda (f) 'fail))))
 
+;read input from file into a scheme list
 (define file->list
 	(lambda (in-file)
 		(let ((in-port (open-input-file in-file)))
@@ -27,6 +29,7 @@
 							(cons ch (run)))))))
 			(run)))))
 
+;write scheme string to file
 (define string->file
   (lambda (str out)
      (begin 
@@ -35,6 +38,7 @@
             (begin (for-each (lambda(ch) (write-char ch out-port)) (string->list str)) 
         (close-output-port out-port))))))
 
+;remove all duplicates from list (for const table)
 (define list->set 
   (lambda (s) 
     (fold-right
@@ -45,21 +49,7 @@
       '()
       s)))
 
-(define ^get-consts
-  (lambda (exp)
-    (cond
-      ((null? exp) '())
-      ((not (list? exp)) '())
-      ((eq? 'const (car exp))
-         (cdr exp))
-      (else (append (^get-consts (car exp)) (^get-consts (cdr exp)))))
-    ))
-
-
-(define split-consts-lst
-  (lambda (lst)
-    (wrapped-split-consts-lst (car lst))))
-
+;take a vector and make it a list
 (define split-vector
   (lambda (lst-vector)
     (cond 
@@ -67,6 +57,12 @@
       (else (cons (car lst-vector) (split-vector (cdr lst-vector)))))
     ))
 
+;recieve a list of consts and wrappen in too many () and sent to the relevant function to actually remove it
+(define split-consts-lst
+  (lambda (lst)
+    (wrapped-split-consts-lst (car lst))))
+
+;remove the const from the pair (const value)
 (define wrapped-split-consts-lst
   (lambda (lst)
     (cond 
@@ -78,7 +74,7 @@
          (cons (car lst) (cons lst (wrapped-split-consts-lst (cdr lst)))))   
   )))
 
-
+;in order to have a toplogy sort, to be used in consts table (build a tree from leaves)
 (define sorter 
   (lambda (s1 s2)
     (cond 
@@ -87,13 +83,26 @@
       (else (< (length s1) (length s2)))
     )))
 
+;run on given expression and save all consts from it - for consts table
+(define ^get-consts
+  (lambda (exp)
+    (cond
+      ((null? exp) '())
+      ((not (list? exp)) '())
+      ((eq? 'const (car exp))
+         (cdr exp))
+      (else (append (^get-consts (car exp)) (^get-consts (cdr exp)))))
+    ))
+
+;run on list of exprs and call ^get consts on each exprs to receive all consts from it
+;after that sort the set achieved from the consts list built out of the consts themselves (without 'const') 
 (define get-consts
   (lambda (list-exprs) 
     (let ((init-consts (map ^get-consts list-exprs)))
      (sort sorter (list->set (append (list (void) '() #f #t) (fold-left append '() (map split-consts-lst init-consts))))
     ))))
 
-
+;generator of unique labels creation (counter)
 (define ^make_label
   (lambda (perfix)
     (let ((n 0))
@@ -102,13 +111,12 @@
         (format "~A_~A" perfix n))))
     )
 
-
-
+;const label
 (define make_const_label
   (^make_label "const"))
 
-
-
+;find val in the const table and return its label (cadr curr)
+; Input is sorted so using look-up is assuming val is in table 
 (define lookup-const
   (lambda (val table)
     (if (null? table) 'error
@@ -120,12 +128,13 @@
     )
   )
 
+;predict for fraction
 (define fraction? 
   (lambda (n)
     (and (not (integer? n)) (rational? n))))
       
-
-
+;create const type according to val type, called at the end after the const table is built
+;so calling lookup-const is k and all elements are already there.
 (define get-const-type 
   (lambda (val table)
     (cond 
@@ -140,6 +149,8 @@
        ((pair? val) `("T_PAIR" ,(lookup-const (car val) table) ,(lookup-const (cdr val) table))))
     ))
 
+;build the const table by iterating the const list, getting the type for the next const and building the table
+; with the next const with unique label, table start empty, list start full, till list is empty and table is built
 (define make-const-table
   (lambda (const-lst)
     (letrec ((iter
@@ -149,12 +160,12 @@
             (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (make_const_label)))))))
       (iter '() const-lst (make_const_label)))))
 
-
 (define string-join
   (lambda (lst delimeter)
     (fold-left string-append (format "~A" (car lst)) (map (lambda (e) (format "~A~A" delimeter e) ) (cdr lst)))  
   ))
 
+;get an assembly build for one const depent on it's type
 (define get-asm-const-line
   (lambda (table-line)
     (let* ((value (caddr table-line))
@@ -175,6 +186,7 @@
       (else "WTF"))
     )))
 
+;get the assmebly build for const table
 (define get-asm-const-table
   (lambda (table)
     (if (null? table) ""
@@ -204,6 +216,9 @@
                                     (code-gen (car lst-expr) ctable)))))
     ))
 
+;the main function called, reading from file in;
+;building lst-exprs from assignment 1-3 and find all consts create ctable
+;build the assembly backround code and call code-gen to compile the code given
 (define compile-scheme-file 
   (lambda (in out)
     (let* ((lst-exprs (pipeline (file->list in)))
@@ -219,6 +234,4 @@
      		 (string->file asm-output out)
         		(display asm-output)
          )))
-    
- 
-             
+                
