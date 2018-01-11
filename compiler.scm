@@ -94,13 +94,21 @@
       (else (append (^get-consts (car exp)) (^get-consts (cdr exp)))))
     ))
 
+;Use to try another way of sort
+(define my_sort
+  (lambda (lst)
+    (sort sorter lst)
+))
+
 ;run on list of exprs and call ^get consts on each exprs to receive all consts from it
 ;after that sort the set achieved from the consts list built out of the consts themselves (without 'const') 
 (define get-consts
   (lambda (list-exprs) 
-    (let ((init-consts (map ^get-consts list-exprs)))
-     (sort sorter (list->set (append (list (void) '() #f #t) (fold-left append '() (map split-consts-lst init-consts))))
-    ))))
+    (let* ((init-consts (map ^get-consts list-exprs))
+      (no_duplicates_list  
+        (list->set (append (list (void) '() #f #t) (fold-left append '() (map split-consts-lst init-consts))))))
+     (my_sort no_duplicates_list))
+    ))
 
 ;generator of unique labels creation (counter)
 (define ^make_label
