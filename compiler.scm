@@ -71,6 +71,7 @@
   (lambda (lst)
     (cond 
        ((null? lst) lst)
+       ((fraction? lst) (cons lst (cons (numerator lst) (cons  (denominator lst) '()))))
        ((vector? lst) (cons lst (split-vector (vector->list lst))))
        ((not (pair? lst)) `(,lst))
        (else 
@@ -119,6 +120,11 @@
     )
   )
 
+(define fraction? 
+  (lambda (n)
+    (and (not (integer? n)) (rational? n))))
+      
+
 
 (define get-const-type 
   (lambda (val table)
@@ -130,7 +136,7 @@
        ((char? val) `("T_CHAR" ,(char->integer val)))
        ((string? val) `("T_STRING" ,val))
        ((vector? val ) `("T_VECTOR" ,@(map (lambda (ele) (lookup-const ele table)) (vector->list val))))
-       ;((fraction? val ))
+       ((fraction? val) `("T_FRACTION" ,(lookup-const (numerator val) table) ,(lookup-const (denominator val) table)))
        ((pair? val) `("T_PAIR" ,(lookup-const (car val) table) ,(lookup-const (cdr val) table))))
     ))
 
@@ -163,7 +169,9 @@
          (format "\t\t~A:\n\t\t\tMAKE_LITERAL_STRING ~S\n" addr (cadr value)))
         ((equal? type "T_VECTOR")
          (format "\t\t~A:\n\t\t\tMAKE_LITERAL_VECTOR ~A\n" 
-                 addr (string-join (map (lambda (e) (format "~A" e)) (cdr value)) ", "))) 
+                 addr (string-join (map (lambda (e) (format "~A" e)) (cdr value)) ", ")))
+        ((equal? type "T_FRACTION") 
+         (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL_FRACTION(~A,~A)\n" addr (cadr value) (caddr value))) 
       (else "WTF"))
     )))
 

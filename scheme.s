@@ -47,6 +47,9 @@
 
 %define MAKE_LITERAL_PAIR(car, cdr) (((((car - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (cdr - start_of_data)) << TYPE_BITS) | T_PAIR)
 
+%define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
+ 
+
 %macro CAR 1
 	DATA_UPPER %1
 	add %1, start_of_data
@@ -630,13 +633,34 @@ write_sob_symbol:
 
 	leave
 	ret
+
 	
 write_sob_fraction:
 	push rbp
 	mov rbp, rsp
 
+	mov rax, qword [rbp + 8 + 1*8]
+	CAR rax
+	push rax
+	call write_sob
+	add rsp, 1*8
+
+	mov rax, 0
+	mov rdi, .slash
+	call printf
+
+	mov rax, qword [rbp + 8 + 1*8]
+	CDR rax
+	push rax
+	call write_sob
+	add rsp, 1*8
+
 	leave
 	ret
+
+section	.data
+.slash:
+	db "/", 0
 
 write_sob_closure:
 	push rbp
