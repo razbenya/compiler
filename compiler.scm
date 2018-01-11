@@ -60,10 +60,18 @@
   (lambda (lst)
     (wrapped-split-consts-lst (car lst))))
 
+(define split-vector
+  (lambda (lst-vector)
+    (cond 
+      ((null? lst-vector) lst-vector)
+      (else (cons (car lst-vector) (split-vector (cdr lst-vector)))))
+    ))
+
 (define wrapped-split-consts-lst
   (lambda (lst)
     (cond 
        ((null? lst) lst)
+       ((vector? lst) (cons lst (split-vector (vector->list lst))))
        ((not (pair? lst)) `(,lst))
        (else 
          (cons (car lst) (cons lst (wrapped-split-consts-lst (cdr lst)))))   
@@ -85,13 +93,18 @@
     ))))
 
 
-(define make_label
+(define ^make_label
   (lambda (perfix)
     (let ((n 0))
       (lambda ()
         (set! n (+ n  1))
         (format "~A_~A" perfix n))))
     )
+
+
+
+(define make_const_label
+  (^make_label "const"))
 
 
 
@@ -115,8 +128,8 @@
        ((null? val) `("T_NIL" ,0)) 
        ((boolean? val) `("T_BOOL" ,(if val 1 0)))
        ((char? val) `("T_CHAR" ,(char->integer val)))
-       ;((string? val) `("T_STRING" todo))
-       ;((vector? val ))
+       ((string? val) `("T_STRING" ,val))
+       ((vector? val ) `("T_VECTOR" ,@(map (lambda (ele) (lookup-const ele table)) (vector->list val))))
        ;((fraction? val ))
        ((pair? val) `("T_PAIR" ,(lookup-const (car val) table) ,(lookup-const (cdr val) table))))
     ))
@@ -127,17 +140,30 @@
       (lambda (table lst addr)
        (if (null? lst) `(,table ,addr)
         (let ((type (get-const-type (car lst) table)))
-            (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (+ addr 8)))))))
-      (iter '() const-lst 0))))
+            (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (make_const_label)))))))
+      (iter '() const-lst (make_const_label)))))
 
+
+(define string-join
+  (lambda (lst delimeter)
+    (fold-left string-append (format "~A" (car lst)) (map (lambda (e) (format "~A~A" delimeter e) ) (cdr lst)))  
+  ))
 
 (define get-asm-const-line
   (lambda (table-line)
     (let* ((value (caddr table-line))
+           (addr (cadr table-line))
            (type (car value)))
       (cond 
-        ((or (equal? type "T_INTEGER") (equal? type "T_NIL") (equal? type "T_VOID") (equal? type "T_BOOL"))
-            (format "dq MAKE_LITERAL(~A,~S)\n" type (cadr value)))
+        ((or (equal? type "T_INTEGER") (equal? type "T_NIL") (equal? type "T_VOID") (equal? type "T_BOOL") (equal? type "T_CHAR"))
+            (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL(~A,~S)\n" addr type (cadr value)))
+        ((equal? type "T_PAIR") 
+         (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL_PAIR(~A,~A)\n" addr (cadr value) (caddr value)))
+        ((equal? type "T_STRING") 
+         (format "\t\t~A:\n\t\t\tMAKE_LITERAL_STRING ~S\n" addr (cadr value)))
+        ((equal? type "T_VECTOR")
+         (format "\t\t~A:\n\t\t\tMAKE_LITERAL_VECTOR ~A\n" 
+                 addr (string-join (map (lambda (e) (format "~A" e)) (cdr value)) ", "))) 
       (else "WTF"))
     )))
 
@@ -146,6 +172,30 @@
     (if (null? table) ""
     (string-append (get-asm-const-line (car table)) (get-asm-const-table (cdr table))))))
 
+
+(define code-gen
+  (lambda (expr ctable)
+    (cond 
+       ((eq? 'const (car expr))
+        	(let* ((value (cadr expr))
+                  (addr (lookup-const value ctable)))
+           		(format "MOV RAX,QWORD[~A]" addr)))
+       )
+    ))
+
+(define code-gen-fromlst
+  (lambda (lst-expr ctable code)
+    (if (null? lst-expr) code 
+        (code-gen-fromlst (cdr lst-expr) ctable 
+                          (string-append code 
+                            (format "
+                                    ~A
+                                    push RAX
+                                    call write_sob_if_not_void
+                                    add RSP,8" 
+                                    (code-gen (car lst-expr) ctable)))))
+    ))
+
 (define compile-scheme-file 
   (lambda (in out)
     (let* ((lst-exprs (pipeline (file->list in)))
@@ -153,12 +203,13 @@
       	   (asm-ctable (string-append 
             "const_table:\n" 
              (get-asm-const-table (car ctable))))
-          	
           
-          	(asm-output (format "%include \"scheme.s\"\nsection .bss \nglobal main\nsection .rodata\n\t~A\nsection .data\n\tmain:\n" asm-ctable)))
+          	(asm-code (code-gen-fromlst lst-exprs (car ctable) "\n"))
+           
+          	(asm-output (format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A\nsection .data\n\tmain:\n~A\n\tret\n" asm-ctable asm-code)))
   			
      		 (string->file asm-output out)
-        		asm-output
+        		(display asm-output)
          )))
     
  
