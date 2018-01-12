@@ -185,6 +185,12 @@
     (if (null? table) ""
     (string-append (get-asm-const-line (car table)) (get-asm-const-table (cdr table))))))
 
+(define make_if_else_label
+  (^make_label "if_else"))
+
+(define make_if_exit_label
+  (^make_label "if_exit"))
+  
 
 (define code-gen
   (lambda (expr ctable)
@@ -193,20 +199,35 @@
         	(let* ((value (cadr expr))
                   (addr (lookup-const value ctable)))
            		(format "MOV RAX,QWORD[~A]" addr)))
-       )
+       ((eq? 'if3 (car expr))
+          (let* ((if_test (cadr expr))
+                 (if_then (caddr expr))
+                 (if_else (cadddr expr))
+                 (label_else (make_if_else_label))
+                 (label_exit (make_if_exit_label)))
+                    (format "~A
+                            CMP RAX,QWORD[~A]
+                            JE ~A
+                            ~A
+                            jmp ~A
+                            ~A:
+                            ~A
+                            ~A:" 
+                    (code-gen if_test ctable) (lookup-const #f ctable) label_else (code-gen if_then ctable) label_exit label_else (code-gen if_else ctable) label_exit)
+       )))
     ))
 
 (define code-gen-fromlst
   (lambda (lst-expr ctable code)
     (if (null? lst-expr) code 
         (code-gen-fromlst (cdr lst-expr) ctable 
-                          (string-append code 
-                            (format "
-                                    ~A
-                                    push RAX
-                                    call write_sob_if_not_void
-                                    add RSP,8" 
-                                    (code-gen (car lst-expr) ctable)))))
+                  (string-append code 
+                    (format "
+                            ~A
+                            push RAX
+                            call write_sob_if_not_void
+                            add RSP,8" 
+                    (code-gen (car lst-expr) ctable)))))
     ))
 
 
