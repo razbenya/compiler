@@ -49,39 +49,12 @@
       '()
       s)))
 
-;take a vector and make it a list
-(define split-vector
-  (lambda (lst-vector)
-    (cond 
-      ((null? lst-vector) lst-vector)
-      (else (cons (car lst-vector) (split-vector (cdr lst-vector)))))
-    ))
 
-;recieve a list of consts and wrappen in too many () and sent to the relevant function to actually remove it
-(define split-consts-lst
-  (lambda (lst)
-    (wrapped-split-consts-lst (car lst))))
+(define get-all-cdr
+  	(lambda (lst)
+    	(cond ((null? lst) lst)
+          	(else (cons (cdr lst) (get-all-cdr (cdr lst)))))))
 
-;remove the const from the pair (const value)
-(define wrapped-split-consts-lst
-  (lambda (lst)
-    (cond 
-       ((null? lst) lst)
-       ((fraction? lst) (cons lst (cons (numerator lst) (cons  (denominator lst) '()))))
-       ((vector? lst) (cons lst (split-vector (vector->list lst))))
-       ((not (pair? lst)) `(,lst))
-       (else 
-         (cons (car lst) (cons lst (wrapped-split-consts-lst (cdr lst)))))   
-  )))
-
-;in order to have a toplogy sort, to be used in consts table (build a tree from leaves)
-(define sorter 
-  (lambda (s1 s2)
-    (cond 
-      ((not (pair? s1)) #t)
-      ((not (pair? s2)) #f)
-      (else (< (length s1) (length s2)))
-    )))
 
 ;run on given expression and save all consts from it - for consts table
 (define ^get-consts
@@ -94,21 +67,33 @@
       (else (append (^get-consts (car exp)) (^get-consts (cdr exp)))))
     ))
 
-;Use to try another way of sort
-(define my_sort
-  (lambda (lst)
-    (sort sorter lst)
-))
 
-;run on list of exprs and call ^get consts on each exprs to receive all consts from it
-;after that sort the set achieved from the consts list built out of the consts themselves (without 'const') 
+; handle all type of consts and typology sort them inside a list 
+; todo add symbol
+(define split-consts
+  (lambda (consts-lst acc)
+    (cond
+      ((null? consts-lst) acc)
+      ((fraction? (car consts-lst)) 
+       		(split-consts (cdr consts-lst) (append acc `(,(numerator (car consts-lst))) `(,(denominator (car consts-lst))) `(,(car consts-lst)))))
+      ((vector? (car consts-lst))
+       	 	(split-consts (cdr consts-lst) (append acc (split-consts (vector->list (car consts-lst)) '()) `( ,(car consts-lst)))))
+      ((pair? (car consts-lst)) 
+       		(split-consts (cdr consts-lst) (append acc (split-consts (car consts-lst) '()) (reverse (get-all-cdr (car consts-lst))) `(,(car consts-lst)))))
+      (else 
+        	(split-consts (cdr consts-lst) (append acc `(,(car consts-lst))))))))
+
+
+ ;	run on list of exprs and call ^get consts on each exprs to receive all consts from it
+;	after that add the basics conts types and remove all duplicates from the list
 (define get-consts
-  (lambda (list-exprs) 
-    (let* ((init-consts (map ^get-consts list-exprs))
-      (no_duplicates_list  
-        (list->set (append (list (void) '() #f #t) (fold-left append '() (map split-consts-lst init-consts))))))
-     (my_sort no_duplicates_list))
-    ))
+  (lambda (list-exprs)
+    (let* ((init-consts-lsts `( ,@(map ^get-consts list-exprs)))
+           (init-consts (fold-left append '() init-consts-lsts))
+    		(no_duplicates_list  
+       			(reverse (list->set  (reverse (append (list (void) '() #f #t) (split-consts init-consts '())))))))
+      no_duplicates_list)))
+
 
 ;generator of unique labels creation (counter)
 (define ^make_label
@@ -223,6 +208,10 @@
                                     add RSP,8" 
                                     (code-gen (car lst-expr) ctable)))))
     ))
+
+
+
+
 
 ;the main function called, reading from file in;
 ;building lst-exprs from assignment 1-3 and find all consts create ctable
