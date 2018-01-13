@@ -178,28 +178,6 @@
           (else (cons (lex-pe-wrapped (car exp) env) (lex-pe-wrapped (cdr exp) env))) 
           )))
 
-
-
-#;(define remove-applic-lambda-nil
-	(lambda (exp)
-		(cond
-      (display (car exp)) 
-			((not (list? exp)) 
-				exp)
-			((or (null? exp) (null? (car exp))) 
-				exp)
-			((null? (cdr exp))
-    			(if (list? (car exp)) (list (remove-applic-lambda-nil (car exp))) exp))
-      ((eq? 'applic (car exp))    
-        (if (and (lambda? (cadr exp)) (null? (caddr exp)) (null? (cadr (cadr exp))))
-              (remove-applic-lambda-nil (caddr (cadr exp)))
-              (cons (car exp) (remove-applic-lambda-nil (cdr exp)))))
-	(else
-		(if (list? (car exp))
-			(cons (remove-applic-lambda-nil (car exp)) (remove-applic-lambda-nil (cdr exp)))
-			(cons (car exp) (remove-applic-lambda-nil (cdr exp)))))
-	)))
-
 (define remove-applic-lambda-nil
   (lambda (exp)
     (cond
