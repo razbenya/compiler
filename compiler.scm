@@ -202,11 +202,12 @@
 (define code-gen
   (lambda (expr ctable)
     (cond 
-      ((null? expr) (format "MOV RAX, QWORD[~A]" (lookup-const expr ctable)))
        ((eq? 'const (car expr))
         	(let* ((value (cadr expr))
                   (addr (lookup-const value ctable)))
-           		(format "MOV RAX,QWORD[~A]" addr)))
+           		       (format "MOV RAX,QWORD[~A]
+                             " addr)))
+
        ((eq? 'if3 (car expr))
           (let* ((if_test (cadr expr))
                  (if_then (caddr expr))
@@ -222,11 +223,11 @@
                             ~A
                             ~A:" 
                     (code-gen if_test ctable) (lookup-const #f ctable) label_else (code-gen if_then ctable) label_exit label_else (code-gen if_else ctable) label_exit)))
+       
        ((eq? 'or (car expr))
           (let ((label_exit (make_or_exit_label)))
         (letrec ((iter
           (lambda (exp rest ans)
-
             (if (not (null? rest))
               (let ((ans (string-append ans 
                     (format "
@@ -237,12 +238,19 @@
                   (code-gen exp ctable) (lookup-const #f ctable) label_exit))))
                 (iter (car rest) (cdr rest) ans))
               (string-append ans
-                      (format "~A
-                              "
+                      (format 
+                            "~A
+                             "
                   (code-gen exp ctable)))
               ))))
-        (string-append (iter (car (cadr expr)) (cdr (cadr expr)) "") (format "~A:" label_exit)))))
-              )))
+        (string-append (iter (car (cadr expr)) (cdr (cadr expr)) "") 
+                    (format "~A:" label_exit))
+        )))
+
+       ((eq? 'seq (car expr))
+        (fold-left string-append "" (map (lambda (exp) (code-gen exp ctable)) (cadr expr)))
+        )
+  )))
 
 ;iterate over the list of exprs and call code-gen for each exprs, appending to it end the expected finish - result in rax, printing if not void, clean.
 (define code-gen-fromlst
