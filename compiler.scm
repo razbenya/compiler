@@ -185,13 +185,15 @@
     (if (null? table) ""
     (string-append (get-asm-const-line (car table)) (get-asm-const-table (cdr table))))))
 
+;else label
 (define make_if_else_label
   (^make_label "if_else"))
 
+;exit label
 (define make_if_exit_label
   (^make_label "if_exit"))
   
-
+;generating one expr code in assembly, depend on type
 (define code-gen
   (lambda (expr ctable)
     (cond 
@@ -217,6 +219,7 @@
        )))
     ))
 
+;iterate over the list of exprs and call code-gen for each exprs, appending to it end the expected finish - result in rax, printing if not void, clean.
 (define code-gen-fromlst
   (lambda (lst-expr ctable code)
     (if (null? lst-expr) code 
