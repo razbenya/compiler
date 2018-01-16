@@ -19,10 +19,17 @@
 ;  (or "a" #t #f 1)
 ;  (or #t "a" #f 1)
 ;  (or #f "a" 1 #t)
-(or #f #f #f #f #f #t #f)
-(or #f #f #f #f #f)
-(begin 1 2 3) ;(seq ((const 1) (const 2) (const 3)))
-(begin #t #f #f 1)
-(begin #t #f #f)
-(begin #t)
-(begin)
+;(or #f #f #f #f #f #t #f)
+;(or #f #f #f #f #f)
+;(begin 1 2 3) ;(seq ((const 1) (const 2) (const 3)))
+;(begin #t #f #f 1)
+;(begin #t #f #f)
+;(begin #t)
+;(begin)
+;'( (1 2) . (4 . #(1 2 3)))
+
+1
+2
+3
+'(4 5)
+

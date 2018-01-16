@@ -78,11 +78,17 @@
        		(split-consts (cdr consts-lst) (append acc `(,(numerator (car consts-lst))) `(,(denominator (car consts-lst))) `(,(car consts-lst)))))
       ((vector? (car consts-lst))
        	 	(split-consts (cdr consts-lst) (append acc (split-consts (vector->list (car consts-lst)) '()) `( ,(car consts-lst)))))
-      ((pair? (car consts-lst)) 
+      ((list? (car consts-lst)) 
        		(split-consts (cdr consts-lst) (append acc (split-consts (car consts-lst) '()) (reverse (get-all-cdr (car consts-lst))) `(,(car consts-lst)))))
+      ((pair? (car consts-lst))
+                (split-consts (cdr consts-lst) (append acc (split-consts (make_list_from_not_proper_list (car consts-lst)) '()) `(, (car consts-lst)))))
       (else 
         	(split-consts (cdr consts-lst) (append acc `(,(car consts-lst))))))))
 
+(define make_list_from_not_proper_list
+    (lambda (almost_lst)
+        (cons (car almost_lst) (cons (cdr almost_lst) '()))
+    ))
 
  ;	run on list of exprs and call ^get consts on each exprs to receive all consts from it
 ;	after that add the basics conts types and remove all duplicates from the list

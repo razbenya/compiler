@@ -195,7 +195,7 @@ sobVec1:
 
 section .bss
 
-extern exit, printf, scanf
+extern exit, printf, scanf, malloc
 global _main, write_sob, write_sob_if_not_void
 section .text
 _main:
@@ -710,6 +710,16 @@ write_sob_if_not_void:
 section .data
 .newline:
 	db CHAR_NEWLINE, 0
-	
-	
+
+
+section .text
+my_malloc:
+	push rbp
+	mov rbp, rsp
+	mov rax, 0
+	mov rdi, qword [rbp + 8 + 1*8]
+	call malloc
+	leave
+	ret 
+
 	
