@@ -206,7 +206,7 @@
 
 ;generating one expr code in assembly, depend on type
 (define code-gen
-  (lambda (expr ctable)
+  (lambda (expr major ctable)
     (cond 
        ((eq? 'const (car expr))
         	(let* ((value (cadr expr))
@@ -228,7 +228,7 @@
                             ~A:
                             ~A
                             ~A:" 
-                    (code-gen if_test ctable) (lookup-const #f ctable) label_else (code-gen if_then ctable) label_exit label_else (code-gen if_else ctable) label_exit)))
+                    (code-gen if_test major ctable) (lookup-const #f ctable) label_else (code-gen if_then major ctable) label_exit label_else (code-gen if_else major ctable) label_exit)))
        
        ((eq? 'or (car expr))
           (let ((label_exit (make_or_exit_label)))
@@ -241,22 +241,196 @@
                            CMP RAX, QWORD[~A]
                            JNE ~A
                            "
-                  (code-gen exp ctable) (lookup-const #f ctable) label_exit))))
+                  (code-gen exp major ctable) (lookup-const #f ctable) label_exit))))
                 (iter (car rest) (cdr rest) ans))
               (string-append ans
                       (format 
                             "~A
                              "
-                  (code-gen exp ctable)))
+                  (code-gen exp major ctable)))
               ))))
         (string-append (iter (car (cadr expr)) (cdr (cadr expr)) "") 
                     (format "~A:" label_exit))
         )))
 
        ((eq? 'seq (car expr))
-        (fold-left string-append "" (map (lambda (exp) (code-gen exp ctable)) (cadr expr)))
-        )
+        (fold-left string-append "" (map (lambda (exp) (code-gen exp major ctable)) (cadr expr))))
+        
+       ((eq? 'lambda-simple (car expr))
+            (code-gen-lambda-simple expr major ctable))
+            
+       ((eq? 'applic (car expr))
+            (code-gen-applic expr major ctable))
+       ((eq? 'pvar (car expr))
+            (code-gen-pvar expr major ctable))
+       ((eq? 'bvar (car expr))
+            (code-gen-bvar expr major ctable))
   )))
+  
+  
+  (define code-gen-pvar
+        (lambda (expr major ctable)
+            (let ((minor (caddr expr)))
+                    (format "mov rax, [rbp + (4+~A) * 8]" minor))))
+                    
+  (define code-gen-bvar
+        (lambda (expr major ctable)
+            (let ((mi (cadddr expr))
+                  (ma (caddr expr)))
+                    (format "mov rax,qword[rbp + 2*8]
+                             mov rax,qword[rax + ~A*8]
+                             mov rax,qword[rax+ ~A*8]
+                            " ma mi))))
+  
+  (define loop_label_enter
+    (^make_label "loop_enter"))
+    
+  (define loop_label_exit
+    (^make_label "loop_exit"))
+    
+  (define lambda_body_start
+    (^make_label "lambda_body_start"))
+    
+  (define lambda_body_end
+    (^make_label "lambda_body_end"))
+    
+ (define make_closure_label
+    (^make_label "closure"))
+  
+  (define code-gen-lambda-simple 
+    (lambda (expr major ctable)
+        (let* (
+            (B (lambda_body_start))
+            (L (lambda_body_end))
+            (epilog (string-append
+                    "
+                    mov rax, 8
+                    "
+                    "push rax
+                    "
+                    "call my_malloc
+                    "
+                    "add rsp, 8
+                    "
+                    "mov rdx, rax
+                    "
+                    "mov rax, " (number->string (* 8 (+ 1 major)))
+                    "
+                    push rax
+                    "
+                    "call my_malloc
+                    "
+                    "add rsp, 8
+                    "
+                    "mov rbx, rax
+                    "))
+            (extend-env
+                (let* ((loop_enter1 (loop_label_enter))
+                      (loop_exit1 (loop_label_exit))
+                      (loop_enter2 (loop_label_enter))
+                      (loop_exit2 (loop_label_exit)))
+                    (string-append
+                        "mov rax, [rbp + 8*2] ;env
+                        mov rdi, 0
+                        "
+                        loop_enter1 ":
+                        cmp rdi, " (number->string major)
+                        "
+                        je " loop_exit1
+                        "
+                        mov r10, [rax + rdi*8]"              ;; for(i=0;i<m;i++)
+                        "
+                        mov [rbx + rdi*8 + 1*8], r10"       ;;  env'[i+1] = env[i]    
+                        "
+                        inc rdi
+                        jmp " loop_enter1
+                        "
+                        "
+                        loop_exit1 ":
+                        mov r8, [rbp+8*3] ;n
+                        mov r9, r8
+                        shl r9, 3
+                        push r9
+                        call my_malloc
+                        add rsp, 8
+                        mov rcx , rax
+                        mov rdi, 0
+                        "
+                        loop_enter2 ":
+                        cmp rdi , r8
+                        je " loop_exit2
+                        "
+                        mov r9, [rbp + (4+rdi) * 8]
+                        mov [rcx + rdi*8], r9 
+                        "               ;; for (i=0; i<n ; i++) rcx[i] = param[i], sub 3*8 to get param and rdi(i) * 8 for param i
+                        "
+                        inc rdi
+                        jmp " loop_enter2
+                        "
+                        "
+                        loop_exit2 ":
+                        mov [rbx], rcx
+                        "
+                    )))
+            (make-closure
+                (let ((closure_label (make_closure_label)))
+                (string-append
+                    "mov rax, 16
+                    push rax
+                    call my_malloc
+                    add rsp, 8
+                    MAKE_LITERAL_CLOSURE rax, rbx, " B "
+                    mov rax,[rax]
+                    jmp " L
+                    "
+                    "
+                    B ":
+                    push rbp
+                    mov rbp, rsp
+                    "
+                    (code-gen (caddr expr) (+ 1 major) ctable) "
+                    leave
+                    ret
+                    "
+                    L ":
+                    "
+                    ))))
+                    
+                (string-append epilog extend-env make-closure))
+            ))
+            
+(define code-gen-applic
+    (lambda (expr major ctable)
+        (let* ((params (caddr expr))
+               (proc (cadr expr))
+               (push-params
+                (string-append 
+                    (string-join (map (lambda (p) (code-gen p major ctable)) (reverse params)) "\npush rax\n")
+                    "push rax
+                    mov rax, " (number->string (length params))
+                    "
+                    push rax
+                    "))
+                (handle-proc
+                    (string-append (code-gen proc major ctable) "
+                                    mov rbx, rax
+                                    TYPE rax
+                                    cmp rax, T_CLOSURE
+                                    JNE ERROR_NOT_CLOSURE
+                                    mov rax, rbx
+                                    CLOSURE_ENV rbx
+                                    push rbx
+                                    CLOSURE_CODE rax
+                                    call rax
+                                    mov r8, " (number->string (+ 16 (* 8 (length params))) )
+                                    "
+                                    add rsp, r8
+                                    ")))
+                (string-append push-params handle-proc))))
+                                    
+                
+                
+        
 
 ;iterate over the list of exprs and call code-gen for each exprs, appending to it end the expected finish - result in rax, printing if not void, clean.
 (define code-gen-fromlst
@@ -269,7 +443,7 @@
                             push RAX
                             call write_sob_if_not_void
                             add RSP,8" 
-                    (code-gen (car lst-expr) ctable)))))
+                    (code-gen (car lst-expr) 0 ctable)))))
     ))
 
 
@@ -289,7 +463,22 @@
           
           	(asm-code (code-gen-fromlst lst-exprs (car ctable) "\n"))
            
-          	(asm-output (format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A\nsection .data\n\tmain:\n~A\n\tret\n" asm-ctable asm-code)))
+          	(asm-output 
+          	(format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A
+          	section .text
+          	\tmain:
+                mov rax, 0
+                push rax
+                mov rax, [const_2]
+                push rax
+                mov rax, 0x1234
+                push rax
+                push rbp
+          	mov rbp, rsp
+                ~A
+                ERROR_NOT_CLOSURE:
+                add rsp, 4*8
+          	ret\n" asm-ctable asm-code)))
   			
      		 (string->file asm-output out)
         		(display asm-output)
