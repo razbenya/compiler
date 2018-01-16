@@ -66,6 +66,34 @@
          (cdr exp))
       (else (append (^get-consts (car exp)) (^get-consts (cdr exp)))))
     ))
+    
+    
+(define fvar-label
+    (^make_label "Lglob"))
+    
+    
+(define get-fvar-lsts
+    (lambda (list-exprs)
+         (let ((fvars `( ,@(map ^get-fvar list-exprs))))
+            (fold-left append '() fvars))))
+
+(define lib-funcs '()) ;todo add lib funcs
+            
+(define build-ftable
+    (lambda (list-fvars)
+        (list->set (append lib-funcs (map (lambda (var) `(,var ,(fvar-label))) list-fvars)))))
+        
+
+    
+(define ^get-fvar
+  (lambda (exp)
+    (cond
+      ((null? exp) '())
+      ((not (list? exp)) '())
+      ((eq? 'fvar (car exp))
+         (cdr exp))
+      (else (append (^get-fvar (car exp)) (^get-fvar (cdr exp)))))
+    ))
 
 
 ; handle all type of consts and typology sort them inside a list 
@@ -446,7 +474,10 @@
                     (code-gen (car lst-expr) 0 ctable)))))
     ))
 
-
+(define get-asm-ftable
+    (lambda (scm-ftable)
+        (if (null? scm-ftable) ""
+            (string-append 
 
 
 
@@ -457,11 +488,14 @@
   (lambda (in out)
     (let* ((lst-exprs (pipeline (file->list in)))
     	   (ctable (make-const-table (get-consts lst-exprs)))
+    	   (ftable (build-ftable (get-fvar-lsts lst-exprs)))
       	   (asm-ctable (string-append 
             "const_table:\n" 
              (get-asm-const-table (car ctable))))
-          
-          	(asm-code (code-gen-fromlst lst-exprs (car ctable) "\n"))
+           (asm-ftable (string-append
+            "global_table:\n"
+            (get-asm-ftable ftable)))
+           (asm-code (code-gen-fromlst lst-exprs (car ctable) "\n"))
            
           	(asm-output 
           	(format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A
@@ -478,7 +512,8 @@
                 ~A
                 ERROR_NOT_CLOSURE:
                 add rsp, 4*8
-          	ret\n" asm-ctable asm-code)))
+          	ret\n" asm-ctable asm-code))
+          	)
   			
      		 (string->file asm-output out)
         		(display asm-output)
