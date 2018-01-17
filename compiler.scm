@@ -73,11 +73,164 @@
          (let ((fvars `( ,@(map ^get-fvar list-exprs))))
             (fold-left append '() fvars))))
 
-(define lib-funcs '()) ;todo add lib funcs
-            
+(define lib-funcs '(boolean? car cdr char? )) ;todo add lib funcs
+
+;generator of unique labels creation (counter)
+(define ^make_label
+  (lambda (perfix)
+    (let ((n 0))
+      (lambda ()
+        (set! n (+ n  1))
+        (format "~A_~A" perfix n))))
+    )
+
+
+(define cmp_false
+  (^make_label "cmp_false"))
+
+(define finish_label
+  (^make_label "finish_label"))
+
+;; lib fun for boolean? 
+(define add-lib-fun-boolean? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'boolean? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      TYPE rax
+                      cmp rax, T_BOOL
+                      jne " cmp_f_label "
+                      mov rax, qword[const_4]
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,qword[const_3]
+                      " finish_l ":
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
+
+;; lib fun for boolean? 
+(define add-lib-fun-char? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'char? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      TYPE rax
+                      cmp rax, T_CHAR
+                      jne " cmp_f_label "
+                      mov rax, qword[const_4]
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,qword[const_3]
+                      " finish_l ":
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
+
+
+(define add-lib-fun-car
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'car ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rbx,rax
+                      TYPE rax
+                      cmp rax,T_PAIR
+                      JNE ERROR_NOT_PAIR
+                      mov rax,rbx
+                      CAR rax
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-cdr
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'cdr ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rbx,rax
+                      TYPE rax
+                      cmp rax,T_PAIR
+                      JNE ERROR_NOT_PAIR
+                      mov rax,rbx
+                      CDR rax
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
+                      
+              
+
 (define build-ftable
     (lambda (list-fvars)
-        (list->set (append lib-funcs (map (lambda (var) `(,var ,(fvar-label))) list-fvars)))))
+        (map (lambda (var) `(,var ,(fvar-label))) (list->set (append lib-funcs list-fvars)))))
         
 
     
@@ -125,14 +278,7 @@
       no_duplicates_list)))
 
 
-;generator of unique labels creation (counter)
-(define ^make_label
-  (lambda (perfix)
-    (let ((n 0))
-      (lambda ()
-        (set! n (+ n  1))
-        (format "~A_~A" perfix n))))
-    )
+
 
 (define fvar-label
     (^make_label "Lglob"))
@@ -302,11 +448,84 @@
             (code-gen-bvar expr major ctable ftable))
        ((eq? 'fvar (car expr))
             (code-gen-fvar expr major ctable ftable))
+       ((or (eq? 'set (car expr)) (eq? 'define (car expr)))
+            (code-gen-setNdefine expr major ctable ftable))
+       ((eq? 'box (car expr))
+            (code-gen-box expr major ctable ftable))
+       ((eq? 'box-get (car expr))
+            (code-gen-box-get expr major ctable ftable))
+       ((eq? 'box-set (car expr))
+            (code-gen-box-set expr major ctable ftable))
   )))
+
+
+  (define code-gen-box-set 
+    (lambda (expr major ctable ftable)
+      (let ((var (cadr expr))
+            (value (caddr expr)))
+        (format "
+                ~A
+                mov rbx,rax
+                ~A
+                mov qword[rax],rbx
+                mov rax,qword[const_1]
+                " (code-gen value major ctable ftable) (code-gen var major ctable ftable)))))
+  
+  (define code-gen-box-get 
+    (lambda (expr major ctable ftable)
+      (let ((var (cadr expr)))
+        (format "
+                ~A
+                mov rax,qword[rax]
+                " (code-gen var major ctable ftable)))))
+              
+  
+  (define code-gen-box 
+    (lambda (expr major ctable ftable)
+      (let ((var (cadr expr)))
+        (format "
+                ~A
+                mov rbx,rax
+                mov rax,8
+                push rax
+                call my_malloc
+                add rsp,8
+                mov qword[rax],rbx
+                " (code-gen var major ctable ftable)))))
+      
+  (define code-gen-setNdefine
+    (lambda (expr major ctable ftable)
+      (let ((var (cadr expr))
+            (value (caddr expr)))
+        (cond
+            ((eq? 'pvar (car var)) 
+              (let ((mi (caddr var)))
+                (format "~A
+                         mov qword[rbp + (4+~A)*8],rax
+                         mov rax, qword[const_1]
+                        " (code-gen value major ctable ftable) mi)))
+            ((eq? 'bvar (car var))
+               (let ((mi (cadddr var))
+                     (ma (caddr var)))
+                 (format "~A
+                          mov rbx, qword[rbp + 2*8]
+                          mov rbx, qword[rbx + ~A*8]
+                          mov qword[rbx + ~A*8], rax
+                          mov rax, qword[const_1] 
+                         " (code-gen value major ctable ftable) ma mi)))
+            (else 
+              (let ((fvar_location (lookup-fvar (cadr var) ftable)))
+                (format "~A
+                         mov qword[~A], rax
+                         mov rax, [const_1]
+                        " (code-gen value major ctable ftable) fvar_location)))
+              
+              ))))
   
   (define code-gen-fvar
       (lambda (expr major ctable ftable)
-        (format "mov rax,qword[~A]" (lookup-fvar (cadr expr) ftable))))
+        (format "mov rax,qword[~A]
+                " (lookup-fvar (cadr expr) ftable))))
 
   (define code-gen-pvar
         (lambda (expr major ctable ftable)
@@ -452,7 +671,7 @@
                     push rax
                     "))
                 (handle-proc
-                    (string-append (code-gen proc major ctable ftalbe) "
+                    (string-append (code-gen proc major ctable ftable) "
                                     mov rbx, rax
                                     TYPE rax
                                     cmp rax, T_CLOSURE
@@ -507,6 +726,16 @@
              (get-asm-const-table (car ctable))))
            (asm-ftable (string-append
                 "global_table:\n" (get-asm-ftable ftable)))
+           
+           (asm-lib-func 
+             (string-append "
+                            " (add-lib-fun-boolean? ftable) "
+                            " (add-lib-fun-car ftable)  "
+                            " (add-lib-fun-cdr ftable) "
+                            " (add-lib-fun-char? ftable) "
+                            "
+                ))
+           
            (asm-code (code-gen-fromlst lst-exprs (car ctable) ftable "\n"))
            
           	(asm-output 
@@ -514,6 +743,7 @@
             ~A
           	section .text
           	\tmain:
+                ~A
                 mov rax, 0
                 push rax
                 mov rax, [const_2]
@@ -524,8 +754,9 @@
           	    mov rbp, rsp
                 ~A
                 ERROR_NOT_CLOSURE:
+                ERROR_NOT_PAIR:
                 add rsp, 4*8
-          	    ret\n" asm-ctable asm-ftable asm-code))
+          	    ret\n" asm-ctable asm-ftable asm-lib-func asm-code))
           	)
   			
      		 (string->file asm-output out)
