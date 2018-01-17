@@ -66,11 +66,7 @@
          (cdr exp))
       (else (append (^get-consts (car exp)) (^get-consts (cdr exp)))))
     ))
-    
-    
-(define fvar-label
-    (^make_label "Lglob"))
-    
+        
     
 (define get-fvar-lsts
     (lambda (list-exprs)
@@ -137,6 +133,10 @@
         (set! n (+ n  1))
         (format "~A_~A" perfix n))))
     )
+
+(define fvar-label
+    (^make_label "Lglob"))
+
 
 ;const label
 (define make_const_label
@@ -231,10 +231,17 @@
 (define make_or_exit_label
   (^make_label "or_exit"))
 
+(define lookup-fvar
+  (lambda (var ftable)
+    (cond 
+      ((null? ftable) 'Error)
+      ((eq? var (caar ftable)) (cadr (car ftable)))
+      (else (lookup-fvar var (cdr ftable)))))
+  )
 
 ;generating one expr code in assembly, depend on type
 (define code-gen
-  (lambda (expr major ctable)
+  (lambda (expr major ctable ftable)
     (cond 
        ((eq? 'const (car expr))
         	(let* ((value (cadr expr))
@@ -256,7 +263,7 @@
                             ~A:
                             ~A
                             ~A:" 
-                    (code-gen if_test major ctable) (lookup-const #f ctable) label_else (code-gen if_then major ctable) label_exit label_else (code-gen if_else major ctable) label_exit)))
+                    (code-gen if_test major ctable ftable) (lookup-const #f ctable) label_else (code-gen if_then major ctable ftable) label_exit label_else (code-gen if_else major ctable ftable) label_exit)))
        
        ((eq? 'or (car expr))
           (let ((label_exit (make_or_exit_label)))
@@ -269,40 +276,45 @@
                            CMP RAX, QWORD[~A]
                            JNE ~A
                            "
-                  (code-gen exp major ctable) (lookup-const #f ctable) label_exit))))
+                  (code-gen exp major ctable ftable) (lookup-const #f ctable) label_exit))))
                 (iter (car rest) (cdr rest) ans))
               (string-append ans
                       (format 
                             "~A
                              "
-                  (code-gen exp major ctable)))
+                  (code-gen exp major ctable ftable)))
               ))))
         (string-append (iter (car (cadr expr)) (cdr (cadr expr)) "") 
                     (format "~A:" label_exit))
         )))
 
        ((eq? 'seq (car expr))
-        (fold-left string-append "" (map (lambda (exp) (code-gen exp major ctable)) (cadr expr))))
+        (fold-left string-append "" (map (lambda (exp) (code-gen exp major ctable ftable)) (cadr expr))))
         
        ((eq? 'lambda-simple (car expr))
-            (code-gen-lambda-simple expr major ctable))
+            (code-gen-lambda-simple expr major ctable ftable))
             
        ((eq? 'applic (car expr))
-            (code-gen-applic expr major ctable))
+            (code-gen-applic expr major ctable ftable))
        ((eq? 'pvar (car expr))
-            (code-gen-pvar expr major ctable))
+            (code-gen-pvar expr major ctable ftable))
        ((eq? 'bvar (car expr))
-            (code-gen-bvar expr major ctable))
+            (code-gen-bvar expr major ctable ftable))
+       ((eq? 'fvar (car expr))
+            (code-gen-fvar expr major ctable ftable))
   )))
   
-  
+  (define code-gen-fvar
+      (lambda (expr major ctable ftable)
+        (format "mov rax,qword[~A]" (lookup-fvar (cadr expr) ftable))))
+
   (define code-gen-pvar
-        (lambda (expr major ctable)
+        (lambda (expr major ctable ftable)
             (let ((minor (caddr expr)))
                     (format "mov rax, [rbp + (4+~A) * 8]" minor))))
                     
   (define code-gen-bvar
-        (lambda (expr major ctable)
+        (lambda (expr major ctable ftable)
             (let ((mi (cadddr expr))
                   (ma (caddr expr)))
                     (format "mov rax,qword[rbp + 2*8]
@@ -326,7 +338,7 @@
     (^make_label "closure"))
   
   (define code-gen-lambda-simple 
-    (lambda (expr major ctable)
+    (lambda (expr major ctable ftable)
         (let* (
             (B (lambda_body_start))
             (L (lambda_body_end))
@@ -416,7 +428,7 @@
                     push rbp
                     mov rbp, rsp
                     "
-                    (code-gen (caddr expr) (+ 1 major) ctable) "
+                    (code-gen (caddr expr) (+ 1 major) ctable ftable) "
                     leave
                     ret
                     "
@@ -428,19 +440,19 @@
             ))
             
 (define code-gen-applic
-    (lambda (expr major ctable)
+    (lambda (expr major ctable ftable)
         (let* ((params (caddr expr))
                (proc (cadr expr))
                (push-params
                 (string-append 
-                    (string-join (map (lambda (p) (code-gen p major ctable)) (reverse params)) "\npush rax\n")
+                    (string-join (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
                     "push rax
                     mov rax, " (number->string (length params))
                     "
                     push rax
                     "))
                 (handle-proc
-                    (string-append (code-gen proc major ctable) "
+                    (string-append (code-gen proc major ctable ftalbe) "
                                     mov rbx, rax
                                     TYPE rax
                                     cmp rax, T_CLOSURE
@@ -462,22 +474,23 @@
 
 ;iterate over the list of exprs and call code-gen for each exprs, appending to it end the expected finish - result in rax, printing if not void, clean.
 (define code-gen-fromlst
-  (lambda (lst-expr ctable code)
+  (lambda (lst-expr ctable ftable code)
     (if (null? lst-expr) code 
-        (code-gen-fromlst (cdr lst-expr) ctable 
+        (code-gen-fromlst (cdr lst-expr) ctable  ftable
                   (string-append code 
                     (format "
                             ~A
                             push RAX
                             call write_sob_if_not_void
                             add RSP,8" 
-                    (code-gen (car lst-expr) 0 ctable)))))
+                    (code-gen (car lst-expr) 0 ctable ftable)))))
     ))
 
 (define get-asm-ftable
     (lambda (scm-ftable)
         (if (null? scm-ftable) ""
-            (string-append 
+              (string-append (cadr (car scm-ftable)) ":\n" "dq SOB_UNDEFINED\n" (get-asm-ftable (cdr scm-ftable))))))
+
 
 
 
@@ -493,12 +506,12 @@
             "const_table:\n" 
              (get-asm-const-table (car ctable))))
            (asm-ftable (string-append
-            "global_table:\n"
-            (get-asm-ftable ftable)))
-           (asm-code (code-gen-fromlst lst-exprs (car ctable) "\n"))
+                "global_table:\n" (get-asm-ftable ftable)))
+           (asm-code (code-gen-fromlst lst-exprs (car ctable) ftable "\n"))
            
           	(asm-output 
           	(format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A
+            ~A
           	section .text
           	\tmain:
                 mov rax, 0
@@ -508,11 +521,11 @@
                 mov rax, 0x1234
                 push rax
                 push rbp
-          	mov rbp, rsp
+          	    mov rbp, rsp
                 ~A
                 ERROR_NOT_CLOSURE:
                 add rsp, 4*8
-          	ret\n" asm-ctable asm-code))
+          	    ret\n" asm-ctable asm-ftable asm-code))
           	)
   			
      		 (string->file asm-output out)

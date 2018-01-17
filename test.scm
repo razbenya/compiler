@@ -31,7 +31,5 @@
 ;(((lambda (x y w) (lambda (z) x w y)) 1 2 3) 4)
 ;((lambda(x) x) 1)
 ;(lambda(x) x)
-(lambda() b)
+;(lambda() b)
 (if 1 c 2)
-
-(define x 8)
