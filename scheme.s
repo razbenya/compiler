@@ -48,7 +48,21 @@
 %define MAKE_LITERAL_PAIR(car, cdr) (((((car - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (cdr - start_of_data)) << TYPE_BITS) | T_PAIR)
 
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
- 
+
+%macro TEST_INT 2
+	shl %1, TYPE_BITS
+	or %1, %2
+%endmacro 
+
+%macro MAKE_PAIR 2
+	sub %1, start_of_data
+	shl %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS) ; equal 34
+	sub %2, start_of_data
+	shl %2, TYPE_BITS
+	or %1, %2
+	or %1, T_PAIR
+%endmacro 
+
 
 %macro CAR 1
 	DATA_UPPER %1

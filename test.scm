@@ -72,3 +72,4 @@
 ;(cons 4 5)
 ;(cons 1 (cons 2 (cons 3 '())))
 (cons 4 6)
+(cons 1 (cons 2 (cons 3 '())))

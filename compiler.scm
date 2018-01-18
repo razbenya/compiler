@@ -113,7 +113,27 @@
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get sec param
-                      ; TODO CREATE PAIR 
+                      
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax],rdx
+                      mov rdx, rax
+
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax], rbx
+                      mov rbx, rax
+
+                      MAKE_PAIR rdx, rbx
+                      
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax], rdx
+                      mov rax, [rax]
+                          
                       leave
                       ret
                       " L ":
