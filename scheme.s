@@ -49,9 +49,9 @@
 
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
 
-%macro TEST_INT 2
+%macro MAKE_INT 1
 	shl %1, TYPE_BITS
-	or %1, %2
+	or %1, T_INTEGER
 %endmacro 
 
 %macro MAKE_PAIR 2
