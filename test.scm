@@ -78,3 +78,4 @@
 (cons a 3)
 (define b "a")
 (cons 1 b)
+(cons "t" 1)
