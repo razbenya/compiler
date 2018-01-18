@@ -74,3 +74,7 @@
 (cons 4 6)
 (define lst (cons 1 (cons 2 (cons 3 '()))))
 (cons 9 (cdr lst))
+(define a '4)
+(cons a 3)
+(define b "a")
+(cons 1 b)
