@@ -93,3 +93,13 @@
 ;(pair? x)
 ;(pair? y)
 ;(pair? z)
+
+(define list? 
+  (lambda (e)
+    (cond 
+      ((null? e) #t)
+      ((pair? e) (list? (cdr e)))
+      (else #f))))
+
+(list? '(1 2 3 4))
+(list? (cons 1 2))

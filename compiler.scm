@@ -795,7 +795,8 @@
             (B (lambda_body_start))
             (L (lambda_body_end))
             (epilog (string-append
-                    "mov rax, " (number->string (* 8 (+ 1 major))) "
+                    "
+                    mov rax, " (number->string (* 8 (+ 1 major))) "
                     push rax
                     call my_malloc
                     add rsp, 8
@@ -807,7 +808,8 @@
                       (loop_enter2 (loop_label_enter))
                       (loop_exit2 (loop_label_exit)))
                     (string-append
-                        "mov rax, [rbp + 8*2] ;env
+                        "
+                        mov rax, [rbp + 8*2] ;env
                         mov rdi, 0
                         "
                         loop_enter1 ":
@@ -852,7 +854,8 @@
             (make-closure
                 (let ((closure_label (make_closure_label)))
                 (string-append
-                    "mov rax, 16
+                    "
+                    mov rax, 16
                     push rax
                     call my_malloc
                     add rsp, 8
@@ -883,9 +886,9 @@
                (push-params
                 (string-append 
                     (string-join (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
-                    "push rax
-                    mov rax, " (number->string (length params))
                     "
+                    push rax
+                    mov rax, " (number->string (length params)) "
                     push rax
                     "))
                 (handle-proc
@@ -899,8 +902,7 @@
                                     push rbx
                                     CLOSURE_CODE rax
                                     call rax
-                                    mov r8, " (number->string (+ 16 (* 8 (length params))) )
-                                    "
+                                    mov r8, " (number->string (+ 16 (* 8 (length params))) ) "
                                     add rsp, r8
                                     ")))
                 (string-append push-params handle-proc))))
