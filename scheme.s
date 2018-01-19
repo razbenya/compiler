@@ -49,10 +49,114 @@
 
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
 
+;change rcx , rdx , rax
+%macro LCM 2
+	mov qword[a], %1
+	mov qword[b], %2
+	push %2
+	push %1
+	call gcd
+	add rsp, 16
+	mov rcx, rax
+	mov rax, qword[a]
+	mov rdx, qword[b]
+	mul rdx
+	xor rdx,rdx
+	idiv rcx
+%endmacro
+
+%macro GCD 2
+	push %2
+	push %1
+	call gcd
+	pop %1
+	pop %2
+%endmacro
+
+%macro MONE 1
+	DATA_UPPER %1
+	add %1, start_of_data
+%endmacro
+
+%macro MECHANE 1
+	DATA_LOWER %1
+	add %1, start_of_data
+%endmacro
+
+%macro REMOVE_FRACTION 1
+	mov rax, %1
+	CDR rax
+	shr rax, TYPE_BITS
+	cmp rax, 1
+	je %%remove
+	mov rax, %1
+	jmp %%finish
+	%%remove:
+	mov rax, %1
+	CAR rax
+	%%finish:
+	mov %1, rax
+%endmacro
+
+%macro REDUCE 1
+	push rcx
+	push rdx
+	push r8
+	push r10
+
+	mov rcx, %1
+	mov rdx, %1
+
+	MONE rcx
+	MECHANE rdx
+	mov qword[a],rcx
+	mov qword[b],rdx
+
+	mov rcx,[rcx]
+	shr rcx, TYPE_BITS
+
+	mov rdx,[rdx]
+	shr rdx, TYPE_BITS
+
+	mov r10, rdx  ; b
+	GCD rcx, rdx
+
+	mov r8, rax   ; gcd
+	mov rax, rcx
+	xor rdx,rdx
+	div r8
+		
+	mov rcx, rax ; rcx <= rcx/gcd
+	mov rax, r10 ; rax <= b
+	xor rdx, rdx
+	div r8	; rax <= b/gcd
+	mov rdx, qword[b]
+	MAKE_INT rax
+	mov [rdx], rax
+	mov rax, rcx
+	mov rcx, qword[a]
+	MAKE_INT rax
+	mov [rcx],rax
+
+	pop r10
+	pop r8
+	pop rdx
+	pop rcx
+%endmacro
+
 %macro MAKE_INT 1
 	shl %1, TYPE_BITS
 	or %1, T_INTEGER
 %endmacro 
+
+%macro MAKE_FRACTION 2
+	sub %1, start_of_data
+	shl %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS)
+	sub %2, start_of_data
+	shl %2, TYPE_BITS
+	or %1, %2
+	or %1, T_FRACTION
+%endmacro
 
 %macro MAKE_PAIR 2
 	sub %1, start_of_data
@@ -165,6 +269,12 @@
 
 section .data
 start_of_data:
+
+a:
+	dq 0
+b:
+	dq 0
+
 sobNil:
 	dq SOB_NIL
 sobInt3:
@@ -746,3 +856,21 @@ my_malloc:
 	ret 
 
 	
+gcd:
+	push rbp
+	mov rbp, rsp
+	mov rax, qword[rbp + 8 + 1*8] ; param1
+	mov rbx, qword[rbp+ 8 + 2*8] ; param2
+
+.loop:
+	cmp rbx, 0
+	je .done
+	cqo
+	idiv rbx
+	mov rax, rbx
+	mov rbx, rdx
+	jmp .loop
+
+.done:
+	pop rbp
+	ret
