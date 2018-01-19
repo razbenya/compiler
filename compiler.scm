@@ -90,7 +90,44 @@
 (define finish_label
   (^make_label "finish_label"))
 
-(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? )) ;todo add lib funcs
+(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? pair? )) ;todo add lib funcs
+
+
+(define add-lib-fun-pair? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'pair? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      TYPE rax
+                      cmp rax, T_PAIR
+                      jne " cmp_f_label "
+                      mov rax, qword[const_4]
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,qword[const_3]
+                      " finish_l ":
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
+
 
 (define add-lib-fun-null?
   (lambda (ftable)
@@ -919,6 +956,7 @@
                             " (add-lib-fun-cons ftable) "
                             " (add-lib-fun-char->integer ftable) "
                             " (add-lib-fun-null? ftable) "
+                            " (add-lib-fun-pair? ftable) "
                             "
                 ))
            
