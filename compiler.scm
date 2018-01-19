@@ -90,8 +90,84 @@
 (define finish_label
   (^make_label "finish_label"))
 
-(define lib-funcs '(boolean? car cdr char? eq? integer? cons )) ;todo add lib funcs
+(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? )) ;todo add lib funcs
 
+(define add-lib-fun-null?
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'null? ftable))
+          (cmp_f_label (cmp_false))
+          (finish_l (finish_label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rax, qword[const_2] ;nil
+                      cmp rdx, rax
+                      jne " cmp_f_label "
+                      mov rax, qword[const_4] ; #t
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax, qword[const_3] ; #f
+                      " finish_l ":    
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-char->integer 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'char->integer ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rax, rdx
+                      TYPE rax
+                      cmp rax, T_CHAR
+                      jne ERROR_NOT_CHAR
+                          
+                      mov rax,8
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                   
+                      shr rdx, TYPE_BITS
+                      shl rdx, TYPE_BITS
+                      or rdx, T_INTEGER
+                     
+                      mov [rax],rdx
+                      mov rax,[rax]
+                          
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
 
 (define add-lib-fun-cons 
   (lambda (ftable)
@@ -113,7 +189,7 @@
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get sec param
-                      
+
                       push 8
                       call my_malloc
                       add rsp, 8
@@ -841,6 +917,8 @@
                             " (add-lib-fun-eq? ftable) "
                             " (add-lib-fun-integer? ftable)"
                             " (add-lib-fun-cons ftable) "
+                            " (add-lib-fun-char->integer ftable) "
+                            " (add-lib-fun-null? ftable) "
                             "
                 ))
            
@@ -861,6 +939,7 @@
                 push rbp
           	    mov rbp, rsp
                 ~A
+                ERROR_NOT_CHAR:
                 ERROR_NOT_CLOSURE:
                 ERROR_NOT_PAIR:
                 add rsp, 4*8

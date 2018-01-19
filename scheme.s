@@ -353,7 +353,7 @@ section .data
 .special:
 	db "#\x%02x", 0
 .regular:
-	db "#\\%c", 0
+	db "#\%c", 0
 
 write_sob_void:
 	push rbp
