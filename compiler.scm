@@ -1012,22 +1012,28 @@
                     add rdi, 3*8
                     mov rsi, 0
                     mov rax, [const_2]
-                    " loop_enter ":
-                    cmp rsi, r8
-                    je " loop_exit "
+                    ;" loop_enter ":
+                    ;cmp rsi, r8
+                    ;je " loop_exit "
+                    ;push rax
+                    ;mov rax, rbp
+                    ;add rax, rdi
+                    ;add rax, r8
+                    ;mov r9, rsi
+                    ;shl r9, 3
+                    ;sub rax, r9 
+                    ;mov rax, [rax]
+                    ;push rax
+                    ;mov rax, [" cons-label "]
+                    ;CALL_LIB_FUN rax, 2
+                    ;inc rsi
+                    ;jmp " loop_enter "
+                    ;" loop_exit ":
                     push rax
-                    mov rax, rbp
-                    add rax, rdi
-                    add rax, r8
-                    mov r9, rsi
-                    shl r9, 3
-                    sub rax, r9 
-                    mov rax, [rax]
+                    mov rax, [rbp + 48]
                     push rax
-                    call " cons-label "
-                    inc rsi
-                    jmp " loop_enter "
-                    " loop_exit ":
+                    mov rax, [" cons-label "]
+                    CALL_LIB_FUN rax, 2        
                     push rax
                     call write_sob_if_not_void
                     add rsp,8
