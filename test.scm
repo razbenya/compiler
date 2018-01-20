@@ -114,4 +114,4 @@
 ;((lambda (x) ((lambda (x y z) x) 1 3 4)) 2)
 ;((lambda (x y z w) ((lambda (x y) x) 15 3)) 19 5 2 4)
 ;((lambda (x t z w) ((lambda (x y) z) 15 3)) 19 5 2 4)
-((lambda (x . y) y) 1 2 3)
+((lambda (x . y) y) 1 2 3 4 5 6 7)

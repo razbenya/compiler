@@ -1010,33 +1010,24 @@
                     sub r8, " (number->string fix-params) "
                     mov rdi, 8* " (number->string fix-params) "
                     add rdi, 3*8
-                    mov rsi, 0
+                    mov rsi, r8
                     mov rax, [const_2]
-                    ;" loop_enter ":
-                    ;cmp rsi, r8
-                    ;je " loop_exit "
-                    ;push rax
-                    ;mov rax, rbp
-                    ;add rax, rdi
-                    ;add rax, r8
-                    ;mov r9, rsi
-                    ;shl r9, 3
-                    ;sub rax, r9 
-                    ;mov rax, [rax]
-                    ;push rax
-                    ;mov rax, [" cons-label "]
-                    ;CALL_LIB_FUN rax, 2
-                    ;inc rsi
-                    ;jmp " loop_enter "
-                    ;" loop_exit ":
+                    " loop_enter ":
+                    cmp rsi, 0
+                    je " loop_exit "
                     push rax
-                    mov rax, [rbp + 48]
+                    mov rax, rsi
+                    shl rax,3
+                    mov r10, rdi
+                    add r10,rax
+                    mov rax, qword[rbp + r10]
                     push rax
                     mov rax, [" cons-label "]
-                    CALL_LIB_FUN rax, 2        
-                    push rax
-                    call write_sob_if_not_void
-                    add rsp,8
+                    CALL_LIB_FUN rax, 2
+                    dec rsi
+                    jmp " loop_enter "
+                    " loop_exit ":
+                    l1:
                     "
                     (code-gen (cadddr expr) (+ 1 major) ctable ftable) "
                     CLEAN_STACK

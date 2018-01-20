@@ -866,11 +866,15 @@ my_malloc:
 	push rdx
 	push rbx
 	push rcx
+	push rdi
+	push rsi
 	push r8
 	mov rax, 0
 	mov rdi, qword [rbp + 8 + 1*8]
 	call malloc
 	pop r8
+	pop rsi
+	pop rdi
 	pop rcx
 	pop rbx
 	pop rdx
