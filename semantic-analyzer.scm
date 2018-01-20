@@ -294,6 +294,5 @@
 
 (define annotate-tc
   (lambda (exp)
-  exp
-    ;(annotate-tc-wrapper exp #f)
+    (annotate-tc-wrapper exp #f)
   ))

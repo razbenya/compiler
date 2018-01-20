@@ -93,21 +93,25 @@
 ;(pair? x)
 ;(pair? y)
 ;(pair? z)
-
 ;(define list? 
 ;  (lambda (e)
 ;    (cond 
 ;      ((null? e) #t)
 ;      ((pair? e) (list? (cdr e)))
 ;      (else #f))));
-
 ;(list? '(1 2 3 4))
 ;(list? (cons 1 2))
 ; (cons 6 4)
+;(zero? 0)
+;(zero? 5)
+;(zero? #f)
+;(zero? '())
+;(zero? (if #f 1 0))
+;(zero? (if #t 1 0));
 
-(zero? 0)
-(zero? 5)
-(zero? #f)
-(zero? '())
-(zero? (if #f 1 0))
-(zero? (if #t 1 0))
+((lambda (x) ((lambda (y) x) 4)) 2)
+((lambda (x y) ((lambda (x y) x) 1 3)) 2 4)
+((lambda (x) ((lambda (x y z) x) 1 3 4)) 2)
+((lambda (x y z w) ((lambda (x y) x) 15 3)) 19 5 2 4)
+((lambda (x t z w) ((lambda (x y) z) 15 3)) 19 5 2 4)
+;((lambda (x . y) y) 1 2 3)

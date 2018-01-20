@@ -127,7 +127,7 @@
                       " cmp_f_label ":
                       mov rax, qword[const_3] ; #f
                       " finish_l ":    
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -162,7 +162,7 @@
                       " cmp_f_label ":
                       mov rax,qword[const_3]
                       " finish_l ":
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -198,7 +198,7 @@
                       " cmp_f_label ":
                       mov rax, qword[const_3] ; #f
                       " finish_l ":    
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -240,7 +240,7 @@
                       mov [rax],rdx
                       mov rax,[rax]
                           
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -287,7 +287,7 @@
                       mov [rax], rdx
                       mov rax, [rax]
                           
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -323,7 +323,7 @@
                       " cmp_f_label ":
                       mov rax,qword[const_3]
                       " finish_l ":
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -359,7 +359,7 @@
                       " cmp_f_label ":
                       mov rax,qword[const_3]
                       " finish_l ":
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -395,7 +395,7 @@
                       " cmp_f_label ":
                       mov rax,qword[const_3]
                       " finish_l ":
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -430,7 +430,7 @@
                       " cmp_f_label ":
                       mov rax,qword[const_3]
                       " finish_l ":
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -462,7 +462,7 @@
                       JNE ERROR_NOT_PAIR
                       mov rax,rbx
                       CAR rax
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -493,7 +493,7 @@
                       JNE ERROR_NOT_PAIR
                       mov rax,rbx
                       CDR rax
-                      leave
+                      CLEAN_STACK
                       ret
                       " L ":
                       ")
@@ -712,9 +712,10 @@
         
        ((eq? 'lambda-simple (car expr))
             (code-gen-lambda-simple expr major ctable ftable))
-            
        ((eq? 'applic (car expr))
             (code-gen-applic expr major ctable ftable))
+       ((eq? 'tc-applic (car expr))
+            (code-gen-tc-applic expr major ctable ftable))
        ((eq? 'pvar (car expr))
             (code-gen-pvar expr major ctable ftable))
        ((eq? 'bvar (car expr))
@@ -909,7 +910,7 @@
                     mov rbp, rsp
                     "
                     (code-gen (caddr expr) (+ 1 major) ctable ftable) "
-                    leave
+                    CLEAN_STACK
                     ret
                     "
                     L ":
@@ -918,13 +919,18 @@
                     
                 (string-append epilog extend-env make-closure))
             ))
+  
+  
             
 (define code-gen-applic
     (lambda (expr major ctable ftable)
         (let* ((params (caddr expr))
                (proc (cadr expr))
                (push-params
-                (string-append 
+                (string-append "
+                    mov rax, [const_2]
+                    push rax
+                    " 
                     (string-join (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
                     "
                     push rax
@@ -942,13 +948,60 @@
                                     push rbx
                                     CLOSURE_CODE rax
                                     call rax
-                                    mov r8, " (number->string (+ 16 (* 8 (length params))) ) "
-                                    add rsp, r8
                                     ")))
                 (string-append push-params handle-proc))))
                                     
                 
-                
+(define code-gen-tc-applic
+    (lambda (expr major ctable ftable)
+        (let* ((params (caddr expr))
+               (proc (cadr expr))
+               (loop_enter (loop_label_enter))
+               (loop_exit (loop_label_exit))
+               (push-params 
+                (string-append "
+                    mov rax, [const_2]
+                    push rax
+                    "
+                    (string-join (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
+                    "
+                    push rax
+                    mov rax, " (number->string (length params)) "
+                    push rax
+                    "))
+                (handle-proc
+                    (string-append (code-gen proc major ctable ftable) "
+                                    mov rbx, rax
+                                    TYPE rax
+                                    cmp rax, T_CLOSURE
+                                    JNE ERROR_NOT_CLOSURE
+                                    mov rax, rbx
+                                    CLOSURE_ENV rbx
+                                    push rbx
+                                    mov r11, qword[rbp + 8*3] ;n                                    
+                                    mov r8,rbp
+                                    mov rbp,[rbp]                                                                 
+                                    mov rbx, [r8+8] ; old ret
+                                    push rbx
+                                    mov rdi,1
+                                    mov r10,rbp                                   
+                                    " loop_enter ":
+                                    cmp rdi, " (number->string (+ 5 (length params))) "
+                                    je " loop_exit "
+                                    sub r8, 8
+                                    mov r9, [r8]
+                                    sub r10,8
+                                    mov [r10], r9
+                                    inc rdi
+                                    jmp " loop_enter "
+                                    " loop_exit ":                                    
+                                    add r11, 4+1
+                                    shl r11, 3 ; (4+n+1)*8
+                                    add rsp, r11                                                          
+                                    CLOSURE_CODE rax
+                                    jmp rax
+                                    ")))
+                (string-append push-params handle-proc))))     
         
 
 ;iterate over the list of exprs and call code-gen for each exprs, appending to it end the expected finish - result in rax, printing if not void, clean.

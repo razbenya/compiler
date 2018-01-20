@@ -83,6 +83,17 @@
 	add %1, start_of_data
 %endmacro
 
+
+%macro CLEAN_STACK 0
+	mov rbx, [rbp + 3*8]                                                
+    pop rbp
+    pop rdx
+    shl rbx,3 
+    add rbx,24                                              
+    add rsp, rbx
+    push rdx
+%endmacro
+
 %macro REMOVE_FRACTION 1
 	mov rax, %1
 	CDR rax
