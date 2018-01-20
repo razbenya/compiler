@@ -90,8 +90,48 @@
 (define finish_label
   (^make_label "finish_label"))
 
-(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? pair? )) ;todo add lib funcs
+; append (variadic), apply (not variadic), < (variadic), = (variadic), > (variadic), + (variadic), /
+; (variadic), * (variadic), - (variadic), denominator,
+; integer->char, list (variadic), make-string, make-vector, map (variadic), not,
+;  number?, numerator,  procedure?, rational?, remainder, set-car!, set-cdr!,
+; string-length, string-ref, string-set!, string->symbol, string?, symbol?, symbol->string,
+; vector, vector-length, vector-ref, vector-set!, vector?
 
+(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? pair? zero?)) ;todo add lib funcs
+
+(define add-lib-fun-zero?
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'zero? ftable))
+          (cmp_f_label (cmp_false))
+          (finish_l (finish_label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      cmp rdx, T_INTEGER
+                      jne " cmp_f_label "
+                      mov rax, qword[const_4] ; #t
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax, qword[const_3] ; #f
+                      " finish_l ":    
+                      leave
+                      ret
+                      " L ":
+                      ")
+      )))
 
 (define add-lib-fun-pair? 
   (lambda (ftable)
@@ -958,6 +998,7 @@
                             " (add-lib-fun-cons ftable) "
                             " (add-lib-fun-char->integer ftable) "
                             " (add-lib-fun-null? ftable) "
+                            " (add-lib-fun-zero? ftable) "
                             " (add-lib-fun-pair? ftable) "
                             "
                 ))

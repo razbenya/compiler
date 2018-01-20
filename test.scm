@@ -103,4 +103,11 @@
 
 ;(list? '(1 2 3 4))
 ;(list? (cons 1 2))
-(cons 6 4)
+; (cons 6 4)
+
+(zero? 0)
+(zero? 5)
+(zero? #f)
+(zero? '())
+(zero? (if #f 1 0))
+(zero? (if #t 1 0))
