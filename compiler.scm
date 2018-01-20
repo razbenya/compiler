@@ -712,6 +712,8 @@
         
        ((eq? 'lambda-simple (car expr))
             (code-gen-lambda-simple expr major ctable ftable))
+       ((eq? 'lambda-opt (car expr))
+            (code-gen-lambda-opt expr major ctable ftable))
        ((eq? 'applic (car expr))
             (code-gen-applic expr major ctable ftable))
        ((eq? 'tc-applic (car expr))
@@ -921,6 +923,125 @@
             ))
   
   
+  (define code-gen-lambda-opt 
+    (lambda (expr major ctable ftable)
+        (let* (
+            (B (lambda_body_start))
+            (L (lambda_body_end))
+            (body (cadddr expr))
+            (fix-params (length (cadr expr)))
+            (loop_enter (loop_label_enter))
+            (loop_exit (loop_label_exit))
+            (cons-label (lookup-fvar 'cons ftable))
+            (epilog (string-append
+                    "
+                    mov rax, " (number->string (* 8 (+ 1 major))) "
+                    push rax
+                    call my_malloc
+                    add rsp, 8
+                    mov rbx, rax
+                    "))
+              (extend-env
+                (let* ((loop_enter1 (loop_label_enter))
+                      (loop_exit1 (loop_label_exit))
+                      (loop_enter2 (loop_label_enter))
+                      (loop_exit2 (loop_label_exit)))
+                    (string-append
+                        "
+                        mov rax, [rbp + 8*2] ;env
+                        mov rdi, 0
+                        "
+                        loop_enter1 ":
+                        cmp rdi, " (number->string major)
+                        "
+                        je " loop_exit1
+                        "
+                        mov r10, [rax + rdi*8]"              ;; for(i=0;i<m;i++)
+                        "
+                        mov [rbx + rdi*8 + 1*8], r10"       ;;  env'[i+1] = env[i]    
+                        "
+                        inc rdi
+                        jmp " loop_enter1
+                        "
+                        "
+                        loop_exit1 ":
+                        mov r8, [rbp+8*3] ;n
+                        mov r9, r8
+                        shl r9, 3
+                        push r9
+                        call my_malloc
+                        add rsp, 8
+                        mov rcx , rax
+                        mov rdi, 0
+                        "
+                        loop_enter2 ":
+                        cmp rdi , r8
+                        je " loop_exit2
+                        "
+                        mov r9, [rbp + (4+rdi) * 8]
+                        mov [rcx + rdi*8], r9 
+                        "               ;; for (i=0; i<n ; i++) rcx[i] = param[i], sub 3*8 to get param and rdi(i) * 8 for param i
+                        "
+                        inc rdi
+                        jmp " loop_enter2
+                        "
+                        "
+                        loop_exit2 ":
+                        mov [rbx], rcx
+                        "
+                    )))
+            (make-closure
+                (let ((closure_label (make_closure_label)))
+                (string-append
+                    "
+                    mov rax, 16
+                    push rax
+                    call my_malloc
+                    add rsp, 8
+                    MAKE_LITERAL_CLOSURE rax, rbx, " B "
+                    mov rax,[rax]
+                    jmp " L
+                    "
+                    "
+                    B ":
+                    push rbp
+                    mov rbp, rsp
+                    mov r8, [rbp+3*8] ;n
+                    sub r8, " (number->string fix-params) "
+                    mov rdi, 8* " (number->string fix-params) "
+                    add rdi, 3*8
+                    mov rsi, 0
+                    mov rax, [const_2]
+                    " loop_enter ":
+                    cmp rsi, r8
+                    je " loop_exit "
+                    push rax
+                    mov rax, rbp
+                    add rax, rdi
+                    add rax, r8
+                    mov r9, rsi
+                    shl r9, 3
+                    sub rax, r9 
+                    mov rax, [rax]
+                    push rax
+                    call " cons-label "
+                    inc rsi
+                    jmp " loop_enter "
+                    " loop_exit ":
+                    push rax
+                    call write_sob_if_not_void
+                    add rsp,8
+                    "
+                    (code-gen (cadddr expr) (+ 1 major) ctable ftable) "
+                    CLEAN_STACK
+                    ret
+                    "
+                    L ":
+                    "
+                    ))))
+                    
+                (string-append epilog extend-env make-closure))
+            ))
             
 (define code-gen-applic
     (lambda (expr major ctable ftable)
