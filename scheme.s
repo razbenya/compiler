@@ -50,7 +50,7 @@
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
 
 %macro CALL_LIB_FUN 2
-	push %2
+	push %2 - 1
 	mov rbx, %1
 	CLOSURE_ENV rbx
 	push rbx

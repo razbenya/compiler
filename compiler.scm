@@ -608,8 +608,15 @@
 
 (define string-join
   (lambda (lst delimeter)
+    (if (null? lst) ""
     (fold-left string-append (format "~A" (car lst)) (map (lambda (e) (format "~A~A" delimeter e) ) (cdr lst)))  
-  ))
+  )))
+
+(define string-join-end
+  (lambda (lst delimeter)
+    (if (null? lst) ""
+    (fold-left string-append "" (map (lambda (e) (format "~A~A" e delimeter) )  lst))  
+  )))
 
 ;get an assembly build for one const depent on it's type
 (define get-asm-const-line
@@ -1027,7 +1034,7 @@
                     dec rsi
                     jmp " loop_enter "
                     " loop_exit ":
-                    l1:
+                    mov [rbp + "(number->string (* 8 (+ 4 fix-params)))"], rax
                     "
                     (code-gen (cadddr expr) (+ 1 major) ctable ftable) "
                     CLEAN_STACK
@@ -1049,9 +1056,8 @@
                     mov rax, [const_2]
                     push rax
                     " 
-                    (string-join (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
+                    (string-join-end (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
                     "
-                    push rax
                     mov rax, " (number->string (length params)) "
                     push rax
                     "))
@@ -1081,9 +1087,8 @@
                     mov rax, [const_2]
                     push rax
                     "
-                    (string-join (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
+                    (string-join-end (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
                     "
-                    push rax
                     mov rax, " (number->string (length params)) "
                     push rax
                     "))
