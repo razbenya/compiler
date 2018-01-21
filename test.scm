@@ -114,6 +114,22 @@
 ;((lambda (x) ((lambda (x y z) x) 1 3 4)) 2)
 ;((lambda (x y z w) ((lambda (x y) x) 15 3)) 19 5 2 4)
 ;((lambda (x t z w) ((lambda (x y) z) 15 3)) 19 5 2 4)
-((lambda (x . y) y) 1 2 3 4 5 6 7)
-((lambda x x) 1 2 3 4 5)
-((lambda x x))
+;((lambda (x . y) y) 1 2 3 4 5 6 7)
+;((lambda x x) 1 2 3 4 5)
+;((lambda x x))
+;(list 1 2 3 4)
+;(define test (lambda x x))
+;(apply test '())
+;(number? 3)
+;(number? 1/2)
+;(number? '())
+;(number? "raz")
+(b_plus 3/4 1/4)
+(define + 
+  (lambda x 
+    (cond ((null? x) 0)
+          (else (b_plus (car x) (apply + (cdr x)))))))
+
+(+ 1/2 1/2 1/2 1 2 3 4)
+
+((lambda (x y) (+ x y)) 4 5)

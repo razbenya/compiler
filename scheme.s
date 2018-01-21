@@ -50,7 +50,7 @@
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
 
 %macro CALL_LIB_FUN 2
-	push %2 - 1
+	push %2
 	mov rbx, %1
 	CLOSURE_ENV rbx
 	push rbx
@@ -58,23 +58,6 @@
 	call %1
 %endmacro
 
-
-
-;change rcx , rdx , rax
-%macro LCM 2
-	mov qword[a], %1
-	mov qword[b], %2
-	push %2
-	push %1
-	call gcd
-	add rsp, 16
-	mov rcx, rax
-	mov rax, qword[a]
-	mov rdx, qword[b]
-	mul rdx
-	xor rdx,rdx
-	idiv rcx
-%endmacro
 
 %macro GCD 2
 	push %2
@@ -103,6 +86,43 @@
     add rbx,24                                              
     add rsp, rbx
     push rdx
+%endmacro
+
+%macro ADD_FRACTION 2
+	mov r10, %1
+	mov r9, %2
+	mov r11, %1
+	mov r12, %2
+	mov r13, %1
+	mov r14, %2
+
+	CAR r10 ;mone 1
+	DATA r10
+	CDR r9  ;mechane 
+	DATA r9
+
+	mov rax, r10
+	mul r9 ; rax <- mone1 * mechane2
+	add1:
+	mov r9, rax
+	CAR r12 ; mone 2
+	DATA r12
+	CDR r11 ; mechane 1
+	DATA r11
+
+	mov rax, r12
+	mul r11 ;rax <- mone2 * mechane1
+	add r9,rax ; r9 <- new mone
+	CDR r13
+	DATA r13
+	CDR r14
+	DATA r14
+	mov rax, r13
+	mul r14 ; rax <- new mechane
+	MAKE_INT rax
+	mov %2, rax
+	MAKE_INT r9
+	mov %1, r9
 %endmacro
 
 %macro REMOVE_FRACTION 1
