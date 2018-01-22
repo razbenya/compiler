@@ -149,10 +149,7 @@
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -233,10 +230,7 @@
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -286,9 +280,7 @@
                       
                       mov rax, const_5                 
                       MAKE_FRACTION rbx, rax
-                      push 8
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 8
                       mov [rax], rbx
                       mov rbx, rax
                                          
@@ -306,9 +298,7 @@
                       mov rax, const_5                 
                       MAKE_FRACTION rdx, rax
                       
-                      push 8
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 8
                       mov [rax], rdx
                       mov rdx, rax
                       
@@ -328,9 +318,7 @@
                       REMOVE_FRACTION rdx              
                       
                       " finish_add ":
-                      push 8
-                      call my_malloc
-                      add rsp,8
+                      test_malloc 8
                       mov [rax],rdx                      
                       CLEAN_STACK
                       ret
@@ -350,10 +338,7 @@
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -403,9 +388,7 @@
                       
                       mov rax, const_5                 
                       MAKE_FRACTION rbx, rax
-                      push 8
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 8
                       mov [rax], rbx
                       mov rbx, rax
                                          
@@ -423,9 +406,7 @@
                       mov rax, const_5                 
                       MAKE_FRACTION rdx, rax
                       
-                      push 8
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 8
                       mov [rax], rdx
                       mov rdx, rax
                       
@@ -448,9 +429,7 @@
                       REMOVE_FRACTION rdx              
                       
                       " finish_add ":
-                      push 8
-                      call my_malloc
-                      add rsp,8
+                      test_malloc 8
                       mov [rax],rdx                      
                       CLEAN_STACK
                       ret
@@ -467,10 +446,7 @@
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -503,10 +479,7 @@
          (cmp_f_label (cmp_false))
          (finish_l (finish_label)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -539,10 +512,7 @@
          (cmp_t_label (cmp_true))
          (finish_l (finish_label)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -580,10 +550,7 @@
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -613,10 +580,7 @@
          (B (lambda_body_start))
          (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -631,10 +595,7 @@
                       cmp rax, T_CHAR
                       jne ERROR_NOT_CHAR
                           
-                      mov rax,8
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 8
                    
                       shr rdx, TYPE_BITS
                       shl rdx, TYPE_BITS
@@ -654,10 +615,7 @@
          (B (lambda_body_start))
          (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       ;mov rax,[rax]
@@ -669,9 +627,7 @@
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get sec param
                       MAKE_PAIR rdx, rbx
-                      push 8
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 8
                       mov [rax], rdx   
                       CLEAN_STACK
                       ret
@@ -688,10 +644,7 @@
          (cmp_f_label (cmp_false))
          (finish_l (finish_label)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -724,10 +677,7 @@
          (cmp_f_label (cmp_false))
          (finish_l (finish_label)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -760,10 +710,7 @@
          (cmp_f_label (cmp_false))
          (finish_l (finish_label)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -795,10 +742,7 @@
          (cmp_f_label (cmp_false))
          (finish_l (finish_label)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -828,10 +772,7 @@
          (B (lambda_body_start))
          (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -859,10 +800,7 @@
          (B (lambda_body_start))
          (L (lambda_body_end)))
       (string-append "
-                      mov rax,16
-                      push rax
-                      call my_malloc
-                      add rsp, 8
+                      test_malloc 16
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
                       mov qword[" addr "], rax
@@ -1156,10 +1094,7 @@
         (format "
                 ~A
                 mov rbx,rax
-                mov rax,8
-                push rax
-                call my_malloc
-                add rsp,8
+               	test_malloc 8
                 mov qword[rax],rbx
                 " (code-gen var major ctable ftable)))))
       
@@ -1233,10 +1168,7 @@
             (L (lambda_body_end))
             (epilog (string-append
                     "
-                    mov rax, " (number->string (* 8 (+ 1 major))) "
-                    push rax
-                    call my_malloc
-                    add rsp, 8
+                   	test_malloc " (number->string (* 8 (+ 1 major))) "
                     mov rbx, rax
                     "))
               (extend-env
@@ -1267,9 +1199,7 @@
                         add r8,1
                         mov r9, r8
                         shl r9, 3
-                        push r9
-                        call my_malloc
-                        add rsp, 8
+                        test_malloc r9
                         mov rcx , rax
                         mov rdi, 0
                         "
@@ -1293,10 +1223,7 @@
                 (let ((closure_label (make_closure_label)))
                 (string-append
                     "
-                    mov rax, 16
-                    push rax
-                    call my_malloc
-                    add rsp, 8
+                   test_malloc 16
                     MAKE_LITERAL_CLOSURE rax, rbx, " B "
                     ;mov rax,[rax]
                     jmp " L
@@ -1330,10 +1257,7 @@
             (cons-label (lookup-fvar 'cons ftable))
             (epilog (string-append
                     "
-                    mov rax, " (number->string (* 8 (+ 1 major))) "
-                    push rax
-                    call my_malloc
-                    add rsp, 8
+                   	test_malloc " (number->string (* 8 (+ 1 major))) "
                     mov rbx, rax
                     "))
               (extend-env
@@ -1364,9 +1288,7 @@
                         add r8, 1
                         mov r9, r8
                         shl r9, 3
-                        push r9
-                        call my_malloc
-                        add rsp, 8
+                        test_malloc r9
                         mov rcx , rax
                         mov rdi, 0
                         "
@@ -1390,10 +1312,7 @@
                 (let ((closure_label (make_closure_label)))
                 (string-append
                     "
-                    mov rax, 16
-                    push rax
-                    call my_malloc
-                    add rsp, 8
+                    test_malloc 16
                     MAKE_LITERAL_CLOSURE rax, rbx, " B "
                     jmp " L
                     "
@@ -1583,6 +1502,8 @@
             ~A
           	section .text
           	\tmain:
+                mov rax, malloc_pointer
+				mov qword [rax], start_of_data2
                 ~A
                 push const_2
                 mov rax, 0

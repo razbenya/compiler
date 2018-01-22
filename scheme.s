@@ -86,19 +86,27 @@
 	neg rax
 	MAKE_INT rax
 	mov r8, rax
-	push 8
-	call my_malloc
-	add rsp, 8
+	test_malloc 8
 	mov [rax], r8
 	mov r8, [%1]
 	packed_cdr r8
 	MAKE_FRACTION rax, r8
 	mov r8, rax
-	push 8
-	call my_malloc
-	add rsp, 8
+	test_malloc 8
 	mov [rax],r8
 	mov %1, rax
+%endmacro
+
+%macro test_malloc 1
+	push rcx
+	push rbx
+	mov rbx, malloc_pointer
+	mov rax, qword [rbx]
+	mov rcx, qword [rbx]
+	add rcx, %1
+	mov qword [rbx], rcx
+	pop rbx
+	pop rcx
 %endmacro
 
 ;; rdx = addr first rbx = addr sec
@@ -142,15 +150,11 @@
 	mov r8, rax
 	MAKE_INT r8
 
-	push 8
-	call my_malloc
-	add rsp,8
+	test_malloc 8
 	mov [rax], r8
 	mov %2, rax
 
-	push 8
-	call my_malloc
-	add rsp,8
+	test_malloc 8
 	mov [rax], r9
 	mov %1, rax
 
@@ -373,6 +377,8 @@
 %define SOB_TRUE MAKE_LITERAL(T_BOOL, 1)
 %define SOB_NIL MAKE_LITERAL(T_NIL, 0)
 
+%define gigabyte(n) n << 30
+
 section .data
 start_of_data:
 
@@ -425,6 +431,11 @@ sobVec1:
 	MAKE_LITERAL_VECTOR sob8, sob7, sobInt1, sobInt2, sobInt3, sob4 
 
 section .bss
+
+malloc_pointer:
+		resq 1
+start_of_data2:
+		resb gigabyte(1)
 
 extern exit, printf, scanf, malloc
 global _main, write_sob, write_sob_if_not_void
