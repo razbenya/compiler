@@ -1584,6 +1584,7 @@
           	section .text
           	\tmain:
                 ~A
+                push const_2
                 mov rax, 0
                 push rax
                 mov rax, [const_2]
@@ -1597,7 +1598,7 @@
                 ERROR_NOT_CLOSURE:
                 ERROR_NOT_PAIR:
                 ERROR_NOT_NUMBER:
-                add rsp, 4*8
+                add rsp, 5*8
           	    ret\n" asm-ctable asm-ftable asm-lib-func asm-code))
           	)
   			
