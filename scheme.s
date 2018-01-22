@@ -52,8 +52,10 @@
 %macro CALL_LIB_FUN 2
 	push %2
 	mov rbx, %1
+	mov rbx, [rbx]
 	CLOSURE_ENV rbx
 	push rbx
+	mov %1 , [%1]
 	CLOSURE_CODE %1
 	call %1
 %endmacro
@@ -67,17 +69,6 @@
 	pop %2
 %endmacro
 
-%macro MONE 1
-	DATA_UPPER %1
-	add %1, start_of_data
-%endmacro
-
-%macro MECHANE 1
-	DATA_LOWER %1
-	add %1, start_of_data
-%endmacro
-
-
 %macro CLEAN_STACK 0
 	mov rbx, [rbp + 3*8]                                                
     pop rbp
@@ -88,47 +79,87 @@
     push rdx
 %endmacro
 
-%macro ADD_FRACTION 2
-	mov r10, %1
-	mov r9, %2
-	mov r11, %1
-	mov r12, %2
-	mov r13, %1
-	mov r14, %2
+%macro NEG_FRACTION 1
+	mov rax, [%1]
+	CAR rax
+	DATA rax
+	neg rax
+	MAKE_INT rax
+	mov r8, rax
+	push 8
+	call my_malloc
+	add rsp, 8
+	mov [rax], r8
+	mov r8, [%1]
+	packed_cdr r8
+	MAKE_FRACTION rax, r8
+	mov r8, rax
+	push 8
+	call my_malloc
+	add rsp, 8
+	mov [rax],r8
+	mov %1, rax
+%endmacro
 
-	CAR r10 ;mone 1
-	DATA r10
-	CDR r9  ;mechane 
+;; rdx = addr first rbx = addr sec
+%macro ADD_FRACTION 2
+	mov qword[a], %1
+	mov qword[b], %2
+	mov r8, [%1] ;first fraction
+	mov r9, [%2] ;sec fraction
+
+	CAR r8	; mone 1
+	DATA r8
+
+	CDR r9  ; mechane 2
 	DATA r9
 
-	mov rax, r10
-	mul r9 ; rax <- mone1 * mechane2
-	add1:
+	mov rax, r8
+	mul r9 ; rax <- mone1 * mechane1
 	mov r9, rax
-	CAR r12 ; mone 2
-	DATA r12
-	CDR r11 ; mechane 1
-	DATA r11
-
-	mov rax, r12
-	mul r11 ;rax <- mone2 * mechane1
-	add r9,rax ; r9 <- new mone
-	CDR r13
-	DATA r13
-	CDR r14
-	DATA r14
-	mov rax, r13
-	mul r14 ; rax <- new mechane
-	MAKE_INT rax
-	mov %2, rax
+	mov %1, qword[a]
+	mov %2, qword[b]
+	mov rax, [%1] ;first fraction
+	mov r8, [%2] ;sec fraction
+	CDR rax	; mone 2
+	DATA rax
+	CAR r8  ; mechane 1
+	DATA r8
+	mul r8
+	add rax, r9 
+	mov r9, rax ;r9 <- new mechane
 	MAKE_INT r9
-	mov %1, r9
+
+	mov %1, qword[a]
+	mov %2, qword[b]
+	mov rax, [%1] ;first fraction
+	mov r8, [%2] ;sec fraction
+	CDR rax	; mone 2
+	DATA rax
+	CDR r8  ; mechane 1
+	DATA r8
+	mul r8 ; rax <-new mechane
+	mov r8, rax
+	MAKE_INT r8
+
+	push 8
+	call my_malloc
+	add rsp,8
+	mov [rax], r8
+	mov %2, rax
+
+	push 8
+	call my_malloc
+	add rsp,8
+	mov [rax], r9
+	mov %1, rax
+
 %endmacro
 
 %macro REMOVE_FRACTION 1
 	mov rax, %1
 	CDR rax
-	shr rax, TYPE_BITS
+	DATA rax
 	cmp rax, 1
 	je %%remove
 	mov rax, %1
@@ -149,32 +180,55 @@
 	mov rcx, %1
 	mov rdx, %1
 
-	MONE rcx
-	MECHANE rdx
+	
+	packed_car rcx
+	packed_cdr rdx
+
+
 	mov qword[a],rcx
 	mov qword[b],rdx
 
+
 	mov rcx,[rcx]
-	shr rcx, TYPE_BITS
+	DATA rcx
 
 	mov rdx,[rdx]
-	shr rdx, TYPE_BITS
+	DATA rdx
 
 	mov r10, rdx  ; b
+
+	cmp rcx, 0
+	jg %%positive
+	neg rcx
+	%%positive:
+
 	GCD rcx, rdx
 
 	mov r8, rax   ; gcd
 	mov rax, rcx
 	xor rdx,rdx
 	div r8
-		
+	
+	mov rcx,qword[a]
+	mov rcx,[rcx]
+	DATA rcx
+	cmp rcx, 0
+	jg %%positive_2
+	neg rax
+	%%positive_2:
+
 	mov rcx, rax ; rcx <= rcx/gcd
+
+
 	mov rax, r10 ; rax <= b
 	xor rdx, rdx
 	div r8	; rax <= b/gcd
+	
 	mov rdx, qword[b]
 	MAKE_INT rax
 	mov [rdx], rax
+
+
 	mov rax, rcx
 	mov rcx, qword[a]
 	MAKE_INT rax
@@ -209,10 +263,20 @@
 	or %1, T_PAIR
 %endmacro
 
+%macro packed_car 1
+	DATA_UPPER %1
+	add %1, start_of_data
+%endmacro
+
 %macro CAR 1
 	DATA_UPPER %1
 	add %1, start_of_data
 	mov %1, qword [%1]
+%endmacro
+
+%macro packed_cdr 1
+	DATA_LOWER %1
+	add %1, start_of_data
 %endmacro
 
 %macro CDR 1
@@ -862,6 +926,7 @@ section .data
 section .text
 write_sob_if_not_void:
 	mov rax, qword [rsp + 1*8]
+	mov rax, [rax]
 	cmp rax, SOB_VOID
 	je .continue
 

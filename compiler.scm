@@ -109,7 +109,32 @@
 ; string-length, string-ref, string-set!, string->symbol, string?, symbol?, symbol->string,
 ; vector, vector-length, vector-ref, vector-set!, vector?
 
-(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? pair? zero? list apply number? )) ;todo add lib funcs
+(define scheme-functions 
+ (map (lambda(e) 
+          (annotate-tc
+          (pe->lex-pe
+          (box-set
+          (remove-applic-lambda-nil (parse e))))))
+  (list  
+    '(define list (lambda x x))
+    
+    '(define + 
+        (lambda x 
+          (cond ((null? x) 0)
+            (else (b_plus (car x) (apply + (cdr x)))))))       
+    
+    '(define - 
+        (lambda (x . y)
+          (letrec ((iter 
+                     (lambda (acc x . z)
+                        (if (null? z) (b_minus acc x)
+                            (apply iter (cons (b_minus acc x) z))))))
+          (if (null? y) (b_minus 0 x)
+                       (apply iter (cons x y))))))
+  ))
+)
+
+(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? pair? zero? number? apply b_plus b_minus)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -130,7 +155,6 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
@@ -138,6 +162,10 @@
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
+                      
+                      mov rdx,[rdx]
+                      mov rbx,[rbx]    
+                          
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_CLOSURE
@@ -160,14 +188,14 @@
                       jne " loop_exit1 "
                       inc rdi
                       mov rax, rbx
-                      CAR rax
+                      packed_car rax
                       push rax
                       CDR rbx
                       jmp " loop_enter1 "
                       " loop_exit1 ":
                       mov rax, ["addr-list"]
                       CALL_LIB_FUN rax, rdi
-                      mov rbx, rax
+                      mov rbx, [rax]
                       mov rdi, 0
                       push T_NIL
                       " loop_enter2 ":
@@ -177,7 +205,7 @@
                       jne " loop_exit2 "
                       inc rdi
                       mov rax, rbx
-                      CAR rax
+                      packed_car rax
                       push rax
                       CDR rbx
                       jmp " loop_enter2 "
@@ -190,14 +218,17 @@
                       ")
       )))
 
+(define both_fraction_l
+  (^make_label "both_fraction"))
+
 
 (define add-lib-fun-b_plus
   (lambda (ftable)
-    (let* ((addr "binary_plus")
+    (let* ((addr (lookup-fvar 'b_plus ftable))
           (check_fraction_2-1 (check_fraction_l))
           (check_fraction_2-2 (check_fraction_l))
           (check_fraction_1-1 (check_fraction_l))
-          (both_fraction ((^make_label "both_fraction")))
+          (both_fraction (both_fraction_l))
           (finish_add (finish_add_l))
           (B (lambda_body_start))
           (L (lambda_body_end)))
@@ -208,28 +239,28 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
-                      mov rbx, qword[rbp + 5*8] ;get 2nd param
-                      
+                      mov rbx, qword[rbp + 5*8] ;get 2nd para
                       ;*** check_first ***
-                      mov rax, rdx 
+                      mov rax, [rdx] 
                       TYPE rax
                       cmp rax, T_INTEGER
                       jne " check_fraction_1-1 "
                       
                       ;*** first: integer check second *****
-                      mov rax, rbx
+                      mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
                       jne " check_fraction_2-1 "
                       
-                      ; **** both are integer ***** 
+                      ; **** both are integer *****
+                      mov rdx, [rdx]
+                      mov rbx, [rbx]                     
                       DATA rdx
                       DATA rbx
                       add rdx, rbx
@@ -238,98 +269,189 @@
                       
                       " check_fraction_1-1 ":
                       
-                      mov rax, rdx
+                      mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_FRACTION
                       jne ERROR_NOT_NUMBER
                       
                       ;**first: fraction check second **
-                      mov rax, rbx
+                      mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
                       je " both_fraction "
                       cmp rax, T_INTEGER
                       jne ERROR_NOT_NUMBER
                       
-                      ; first: fraction second: integer 
-                      mov r8, 1
-                      MAKE_INT r8
-                      push 8
-                      call my_malloc
-                      add rsp, 8
-                      mov [rax],r8                   
-                      mov r8, rax
-                                         
-                      push 8
-                      call my_malloc
-                      add rsp, 8
-                      mov [rax],rbx                   
-                                               
-                      MAKE_FRACTION rax, r8
-                      mov rbx, rax
+                      ; first: fraction second: integer                   
                       
+                      mov rax, const_5                 
+                      MAKE_FRACTION rbx, rax
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax], rbx
+                      mov rbx, rax
                                          
                       jmp " both_fraction "
                       
                       " check_fraction_2-1 ":
                       
                       ;first: integer check second
-                      mov rax, rdx
+                      mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_INTEGER
                       jne " check_fraction_2-2 "
                       ;first: integer second: fraction
-                      mov r8, 1
-                      MAKE_INT r8
-                      push 8
-                      call my_malloc
-                      add rsp, 8
-                      mov [rax],r8                   
-                      mov r8, rax
-                                         
-                      push 8
-                      call my_malloc
-                      add rsp, 8
-                      mov [rax],rdx                   
                                                
-                      MAKE_FRACTION rax, r8
+                      mov rax, const_5                 
+                      MAKE_FRACTION rdx, rax
+                      
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax], rdx
                       mov rdx, rax
                       
+                                                                       
                       jmp " both_fraction "
                       
                       " check_fraction_2-2 ":
-                      mov rax, rbx
+                      mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
                       jne ERROR_NOT_NUMBER                     
                       " both_fraction ":
                       
-                      ADD_FRACTION rdx, rbx
-                                   
-                      push 8
-                      call my_malloc
-                      add rsp,8
-                      mov [rax], rdx
-                      mov rdx, rax
-                      
-                      push 8
-                      call my_malloc
-                      add rsp,8
-                      mov [rax], rbx
-                      mov rbx, rax               
-                      
+                      ADD_FRACTION rdx, rbx               
                       MAKE_FRACTION rdx, rbx
-                      
                       REDUCE rdx
-
                       REMOVE_FRACTION rdx              
                       
                       " finish_add ":
                       push 8
                       call my_malloc
                       add rsp,8
-                      mov [rax],rdx
-                      mov rax, [rax]                      
+                      mov [rax],rdx                      
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+
+(define add-lib-fun-b_minus
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'b_minus ftable))
+          (check_fraction_2-1 (check_fraction_l))
+          (check_fraction_2-2 (check_fraction_l))
+          (check_fraction_1-1 (check_fraction_l))
+          (both_fraction (both_fraction_l))
+          (finish_add (finish_add_l))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      mov rax,16
+                      push rax
+                      call my_malloc
+                      add rsp, 8
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rbx, qword[rbp + 5*8] ;get 2nd para
+                      ;*** check_first ***
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " check_fraction_1-1 "
+                      
+                      ;*** first: integer check second *****
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " check_fraction_2-1 "
+                      
+                      ; **** both are integer *****
+                      mov rdx, [rdx]
+                      mov rbx, [rbx]                     
+                      DATA rdx
+                      DATA rbx
+                      sub rdx, rbx
+                      MAKE_INT rdx
+                      jmp " finish_add "
+                      
+                      " check_fraction_1-1 ":
+                      
+                      mov rax, [rdx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      jne ERROR_NOT_NUMBER
+                      
+                      ;**first: fraction check second **
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je " both_fraction "
+                      cmp rax, T_INTEGER
+                      jne ERROR_NOT_NUMBER
+                      
+                      ; first: fraction second: integer                   
+                      
+                      mov rax, const_5                 
+                      MAKE_FRACTION rbx, rax
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax], rbx
+                      mov rbx, rax
+                                         
+                      jmp " both_fraction "
+                      
+                      " check_fraction_2-1 ":
+                      
+                      ;first: integer check second
+                      mov rax, [rdx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " check_fraction_2-2 "
+                      ;first: integer second: fraction
+                                               
+                      mov rax, const_5                 
+                      MAKE_FRACTION rdx, rax
+                      
+                      push 8
+                      call my_malloc
+                      add rsp, 8
+                      mov [rax], rdx
+                      mov rdx, rax
+                      
+                                                                       
+                      jmp " both_fraction "
+                      
+                      " check_fraction_2-2 ":
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      jne ERROR_NOT_NUMBER                     
+                      " both_fraction ":
+                      
+                      NEG_FRACTION rbx
+                      
+                      ADD_FRACTION rdx, rbx 
+                                 
+                      MAKE_FRACTION rdx, rbx
+                      REDUCE rdx
+                      REMOVE_FRACTION rdx              
+                      
+                      " finish_add ":
+                      push 8
+                      call my_malloc
+                      add rsp,8
+                      mov [rax],rdx                      
                       CLEAN_STACK
                       ret
                       " L ":
@@ -351,19 +473,19 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rdx, [rdx]
                       cmp rdx, T_INTEGER
                       jne " cmp_f_label "
-                      mov rax, qword[const_4] ; #t
+                      mov rax, const_4 ; #t
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax, qword[const_3] ; #f
+                      mov rax, const_3 ; #f
                       " finish_l ":    
                       CLEAN_STACK
                       ret
@@ -371,54 +493,7 @@
                       ")
       )))
 
-(define add-lib-fun-list
-  (lambda (ftable)
-    (let ((addr (lookup-fvar 'list ftable))
-          (addr-cons (lookup-fvar 'cons ftable))
-          (loop_enter (loop_label_enter))
-          (loop_exit (loop_label_exit))
-          (B (lambda_body_start))
-          (L (lambda_body_end)))
-      (string-append "
-                    mov rax, 16
-                    push rax
-                    call my_malloc
-                    add rsp, 8
-                    mov rbx, 0
-                    MAKE_LITERAL_CLOSURE rax, rbx, " B"
-                    mov rax,[rax] 
-                    jmp " L " 
-                    " B ":
-                    push rbp
-                    mov rbp, rsp
-                    mov r8, [rbp+3*8] ;n
-                    mov rdi, 0*8
-                    add rdi, 3*8
-                    mov rsi, r8
-                    mov rax, [const_2] ; nill
-                    "loop_enter":
-                    cmp rsi, 0
-                    je "loop_exit"
-                    push rax
-                    mov rax, rsi
-                    shl rax,3
-                    mov r10, rdi
-                    add r10,rax
-                    mov rax, qword[rbp + r10]
-                    push rax
-                    mov rax, ["addr-cons"]
-                    CALL_LIB_FUN rax, 1
-                    dec rsi
-                    jmp " loop_enter "
-                    "loop_exit":
-                    mov [rbp + 32], rax
-                    mov rax, [rbp + (4+0) * 8]
-                    CLEAN_STACK
-                    ret
-                    "L":
-                    mov qword["addr"], rax"              
-         )
-      )))
+
 
 (define add-lib-fun-pair? 
   (lambda (ftable)
@@ -434,20 +509,20 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
                       TYPE rax
                       cmp rax, T_PAIR
                       jne " cmp_f_label "
-                      mov rax, qword[const_4]
+                      mov rax,const_4
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax,qword[const_3]
+                      mov rax,const_3
                       " finish_l ":
                       CLEAN_STACK
                       ret
@@ -470,25 +545,25 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
                       TYPE rax
                       cmp rax, T_INTEGER
                       jne " cmp_f_label "
-                      mov rax, qword[const_4]
+                      mov rax, const_4
                       jmp " finish_l "
                       " cmp_f_label ":
                       cmp rax, T_FRACTION
                       je " cmp_t_label "
-                      mov rax,qword[const_3]
+                      mov rax,const_3
                       jmp " finish_l "
                       " cmp_t_label ":
-                      mov rax, qword[const_4]                            
+                      mov rax, const_4                            
                       " finish_l ":
                       CLEAN_STACK
                       ret
@@ -511,20 +586,20 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rdx,[rdx]
                       mov rax, qword[const_2] ;nil
                       cmp rdx, rax
                       jne " cmp_f_label "
-                      mov rax, qword[const_4] ; #t
+                      mov rax, const_4 ; #t
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax, qword[const_3] ; #f
+                      mov rax, const_3 ; #f
                       " finish_l ":    
                       CLEAN_STACK
                       ret
@@ -544,13 +619,13 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rdx,[rdx]
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_CHAR
@@ -566,7 +641,6 @@
                       or rdx, T_INTEGER
                      
                       mov [rax],rdx
-                      mov rax,[rax]
                           
                       CLEAN_STACK
                       ret
@@ -586,7 +660,7 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
+                      ;mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
@@ -594,27 +668,11 @@
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get sec param
-
-                      push 8
-                      call my_malloc
-                      add rsp, 8
-                      mov [rax],rdx
-                      mov rdx, rax
-
-                      push 8
-                      call my_malloc
-                      add rsp, 8
-                      mov [rax], rbx
-                      mov rbx, rax
-
                       MAKE_PAIR rdx, rbx
-                      
                       push 8
                       call my_malloc
                       add rsp, 8
-                      mov [rax], rdx
-                      mov rax, [rax]
-                          
+                      mov [rax], rdx   
                       CLEAN_STACK
                       ret
                       " L ":
@@ -636,20 +694,20 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
                       TYPE rax
                       cmp rax, T_BOOL
                       jne " cmp_f_label "
-                      mov rax, qword[const_4]
+                      mov rax, const_4
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax,qword[const_3]
+                      mov rax,const_3
                       " finish_l ":
                       CLEAN_STACK
                       ret
@@ -672,20 +730,20 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax,[rax]
                       TYPE rax
                       cmp rax, T_INTEGER
                       jne " cmp_f_label "
-                      mov rax, qword[const_4]
+                      mov rax, const_4
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax,qword[const_3]
+                      mov rax,const_3
                       " finish_l ":
                       CLEAN_STACK
                       ret
@@ -708,20 +766,20 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax,[rax]
                       TYPE rax
                       cmp rax, T_CHAR
                       jne " cmp_f_label "
-                      mov rax, qword[const_4]
+                      mov rax, const_4
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax,qword[const_3]
+                      mov rax,const_3
                       " finish_l ":
                       CLEAN_STACK
                       ret
@@ -743,7 +801,6 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
@@ -753,10 +810,10 @@
                       mov rbx, qword[rbp + 5*8] ;get secound param
                       cmp rax, rbx
                       jne " cmp_f_label "
-                      mov rax, qword[const_4]
+                      mov rax, const_4 
                       jmp " finish_l "
                       " cmp_f_label ":
-                      mov rax,qword[const_3]
+                      mov rax,const_3
                       " finish_l ":
                       CLEAN_STACK
                       ret
@@ -777,19 +834,19 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
                       mov rbx,rax
                       TYPE rax
                       cmp rax,T_PAIR
                       JNE ERROR_NOT_PAIR
                       mov rax,rbx
-                      CAR rax
+                      packed_car rax
                       CLEAN_STACK
                       ret
                       " L ":
@@ -808,19 +865,19 @@
                       add rsp, 8
                       mov rbx,0 ;setup fake env
                       MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov rax,[rax]
                       mov qword[" addr "], rax
                       jmp " L "
                       " B ":
                       push rbp
                       mov rbp, rsp
                       mov rax, qword[rbp + 4*8]
+                      mov rax,[rax]
                       mov rbx,rax
                       TYPE rax
                       cmp rax,T_PAIR
                       JNE ERROR_NOT_PAIR
                       mov rax,rbx
-                      CDR rax
+                      packed_cdr rax
                       CLEAN_STACK
                       ret
                       " L ":
@@ -875,7 +932,7 @@
     (let* ((init-consts-lsts `( ,@(map ^get-consts list-exprs)))
            (init-consts (fold-left append '() init-consts-lsts))
     		(no_duplicates_list  
-       			(reverse (list->set  (reverse (append (list (void) '() #f #t) (split-consts init-consts '())))))))
+       			(reverse (list->set  (reverse (append (list (void) '() #f #t 1) (split-consts init-consts '())))))))
       no_duplicates_list)))
 
 
@@ -989,7 +1046,6 @@
   (lambda (var ftable)
     (cond 
       ((null? ftable) 'Error)
-      ((eq? var 'b_plus ) "binary_plus")
       ((eq? var (caar ftable)) (cadr (car ftable)))
       (else (lookup-fvar var (cdr ftable)))))
   )
@@ -1001,7 +1057,7 @@
        ((eq? 'const (car expr))
         	(let* ((value (cadr expr))
                   (addr (lookup-const value ctable)))
-           		       (format "MOV RAX,QWORD[~A]
+           		       (format "MOV RAX,~A
                              " addr)))
 
        ((eq? 'if3 (car expr))
@@ -1011,6 +1067,7 @@
                  (label_else (make_if_else_label))
                  (label_exit (make_if_exit_label)))
                     (format "~A
+                            mov rax, [rax]
                             CMP RAX,QWORD[~A]
                             JE ~A
                             ~A
@@ -1028,7 +1085,8 @@
               (let ((ans (string-append ans 
                     (format "
                            ~A
-                           CMP RAX, QWORD[~A]
+                           mov rbx,[rax] 
+                           CMP RBX, QWORD[~A] ; #f
                            JNE ~A
                            "
                   (code-gen exp major ctable ftable) (lookup-const #f ctable) label_exit))))
@@ -1114,7 +1172,7 @@
               (let ((mi (caddr var)))
                 (format "~A
                          mov qword[rbp + (4+~A)*8],rax
-                         mov rax, qword[const_1]
+                         mov rax, const_1
                         " (code-gen value major ctable ftable) mi)))
             ((eq? 'bvar (car var))
                (let ((mi (cadddr var))
@@ -1123,13 +1181,13 @@
                           mov rbx, qword[rbp + 2*8]
                           mov rbx, qword[rbx + ~A*8]
                           mov qword[rbx + ~A*8], rax
-                          mov rax, qword[const_1] 
+                          mov rax, const_1 
                          " (code-gen value major ctable ftable) ma mi)))
             (else 
               (let ((fvar_location (lookup-fvar (cadr var) ftable)))
                 (format "~A
                          mov qword[~A], rax
-                         mov rax, [const_1]
+                         mov rax, const_1
                         " (code-gen value major ctable ftable) fvar_location)))
               
               ))))
@@ -1206,6 +1264,7 @@
                         "
                         loop_exit1 ":
                         mov r8, [rbp+8*3] ;n
+                        add r8,1
                         mov r9, r8
                         shl r9, 3
                         push r9
@@ -1239,7 +1298,7 @@
                     call my_malloc
                     add rsp, 8
                     MAKE_LITERAL_CLOSURE rax, rbx, " B "
-                    mov rax,[rax]
+                    ;mov rax,[rax]
                     jmp " L
                     "
                     "
@@ -1302,6 +1361,7 @@
                         "
                         loop_exit1 ":
                         mov r8, [rbp+8*3] ;n
+                        add r8, 1
                         mov r9, r8
                         shl r9, 3
                         push r9
@@ -1335,7 +1395,6 @@
                     call my_malloc
                     add rsp, 8
                     MAKE_LITERAL_CLOSURE rax, rbx, " B "
-                    mov rax,[rax]
                     jmp " L
                     "
                     "
@@ -1347,7 +1406,7 @@
                     mov rdi, 8* " (number->string fix-params) "
                     add rdi, 3*8
                     mov rsi, r8
-                    mov rax, [const_2]
+                    mov rax, const_2
                     " loop_enter ":
                     cmp rsi, 0
                     je " loop_exit "
@@ -1359,8 +1418,7 @@
                     mov rax, qword[rbp + r10]
                     push rax
                     mov rax, [" cons-label "]
-                    CALL_LIB_FUN rax, 1
-                                           
+                    CALL_LIB_FUN rax, 1                    
                     dec rsi
                     jmp " loop_enter "
                     " loop_exit ":
@@ -1383,7 +1441,7 @@
                (proc (cadr expr))
                (push-params
                 (string-append "
-                    mov rax, [const_2]
+                    mov rax, const_2
                     push rax
                     " 
                     (string-join-end (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
@@ -1394,6 +1452,8 @@
                 (handle-proc
                     (string-append (code-gen proc major ctable ftable) "
                                     mov rbx, rax
+                                    mov rbx, [rbx]
+                                    mov rax, [rax]
                                     TYPE rax
                                     cmp rax, T_CLOSURE
                                     JNE ERROR_NOT_CLOSURE
@@ -1414,7 +1474,7 @@
                (loop_exit (loop_label_exit))
                (push-params 
                 (string-append "
-                    mov rax, [const_2]
+                    mov rax, const_2
                     push rax
                     "
                     (string-join-end (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
@@ -1424,6 +1484,7 @@
                     "))
                 (handle-proc
                     (string-append (code-gen proc major ctable ftable) "
+                                    mov rax,[rax]
                                     mov rbx, rax
                                     TYPE rax
                                     cmp rax, T_CLOSURE
@@ -1484,7 +1545,7 @@
 ;build the assembly backround code and call code-gen to compile the code given
 (define compile-scheme-file 
   (lambda (in out)
-    (let* ((lst-exprs (pipeline (file->list in)))
+    (let* ((lst-exprs (append scheme-functions  (pipeline (file->list in))))
     	   (ctable (make-const-table (get-consts lst-exprs)))
     	   (ftable (build-ftable (get-fvar-lsts lst-exprs)))
       	   (asm-ctable (string-append 
@@ -1506,11 +1567,13 @@
                             " (add-lib-fun-null? ftable) "
                             " (add-lib-fun-zero? ftable) "
                             " (add-lib-fun-pair? ftable) "
-                            " (add-lib-fun-list ftable) "
-                            " (add-lib-fun-apply ftable) "
                             " (add-lib-fun-number? ftable) "
+                            " (add-lib-fun-apply ftable) "
                             " (add-lib-fun-b_plus ftable) "
+                            " (add-lib-fun-b_minus ftable) "
                             "
+               
+                            
                 ))
            
            (asm-code (code-gen-fromlst lst-exprs (car ctable) ftable "\n"))
@@ -1518,8 +1581,6 @@
           	(asm-output 
           	(format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A
             ~A
-            binary_plus:
-              dq 0
           	section .text
           	\tmain:
                 ~A
