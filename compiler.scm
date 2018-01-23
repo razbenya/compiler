@@ -83,6 +83,9 @@
         (format "~A_~A" perfix n))))
     )
 
+                
+(define error-label
+  (^make_label "ERROR"))
 
 (define cmp_false
   (^make_label "cmp_false"))
@@ -102,12 +105,17 @@
 (define finish_add_l
   (^make_label "finish_add"))
 
-; append (variadic), < (variadic), = (variadic), > (variadic), /
-; (variadic), * (variadic), - (variadic), denominator,
-; integer->char, make-string, make-vector, map (variadic), not,
-; number?, numerator,  procedure?, rational?, remainder, set-car!, set-cdr!,
-; string-length, string-ref, string-set!, string->symbol, string?, symbol?, symbol->string,
-; vector, vector-length, vector-ref, vector-set!, vector?
+(define positive-label
+  (^make_label "positive"))
+
+(define equal-l
+  (^make_label "equal"))
+
+; append (variadic), < (variadic), > (variadic), 
+;/ (variadic), * (variadic),
+; make-string, make-vector, map (variadic),
+; string-length, string-ref, string-set!, string->symbol, symbol?, symbol->string,
+; vector, vector-length, vector-ref, vector-set!,
 
 (define scheme-functions 
  (map (lambda(e) 
@@ -115,7 +123,8 @@
           (pe->lex-pe
           (box-set
           (remove-applic-lambda-nil (parse e))))))
-  (list  
+  (list 
+     
     '(define list (lambda x x))
     
     '(define + 
@@ -131,10 +140,17 @@
                             (apply iter (cons (b_minus acc x) z))))))
           (if (null? y) (b_minus 0 x)
                        (apply iter (cons x y))))))
+    '(define =
+       (lambda (x . y)
+         (if (null? y) #t
+             (and (b_equal x (car y)) (apply = y))))) 
   ))
 )
 
-(define lib-funcs '(boolean? car cdr char? eq? integer? cons char->integer null? pair? zero? number? apply b_plus b_minus)) ;todo add lib funcs
+(define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
+                     cons char->integer integer->char null? pair? zero? number? numerator
+                     apply b_plus b_minus vector? rational? string? procedure? 
+                     set-car! set-cdr! not b_equal )) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -144,6 +160,8 @@
           (loop_exit1 (loop_label_exit))
           (loop_enter2 (loop_label_enter))
           (loop_exit2 (loop_label_exit))
+          (finish_l (finish_label))
+          (error_l (error-label))
           (check_nil ((^make_label "check_nil")))
           (type_ok (type_ok_label))
           (B (lambda_body_start))
@@ -157,6 +175,9 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      mov rax, qword[rbp + 3*8] ;n
+                      cmp rax, 2
+                      jne "error_l"
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
                       
@@ -166,7 +187,7 @@
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_CLOSURE
-                      jne ERROR_NOT_CLOSURE
+                      jne "error_l"
                       mov rax, rbx
                       TYPE rax
                       cmp rax, T_PAIR
@@ -174,7 +195,7 @@
                       jmp " type_ok "
                       " check_nil ":
                       cmp rax, T_NIL
-                      JNE ERROR_NOT_PAIR
+                      JNE "error_l"
                       " type_ok ":
                       mov rdi, 0
                       push T_NIL
@@ -209,6 +230,11 @@
                       " loop_exit2 ":
                       mov rdx, qword[rbp + 4*8] ;get first param
                       CALL_LIB_FUN rdx, rdi
+                      jmp "finish_l "
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " finish_l ":
                       CLEAN_STACK
                       ret
                       " L ":
@@ -227,6 +253,7 @@
           (check_fraction_1-1 (check_fraction_l))
           (both_fraction (both_fraction_l))
           (finish_add (finish_add_l))
+          (error_l (error-label))
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
@@ -239,7 +266,7 @@
                       push rbp
                       mov rbp, rsp
                       mov rdx, qword[rbp + 4*8] ;get first param
-                      mov rbx, qword[rbp + 5*8] ;get 2nd para
+                      mov rbx, qword[rbp + 5*8] ;get 2nd param
                       ;*** check_first ***
                       mov rax, [rdx] 
                       TYPE rax
@@ -266,7 +293,7 @@
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne ERROR_NOT_NUMBER
+                      jne "error_l"
                       
                       ;**first: fraction check second **
                       mov rax, [rbx]
@@ -274,7 +301,7 @@
                       cmp rax, T_FRACTION
                       je " both_fraction "
                       cmp rax, T_INTEGER
-                      jne ERROR_NOT_NUMBER
+                      jne "error_l"
                       
                       ; first: fraction second: integer                   
                       
@@ -289,7 +316,7 @@
                       " check_fraction_2-1 ":
                       
                       ;first: integer check second
-                      mov rax, [rdx]
+                      mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
                       jne " check_fraction_2-2 "
@@ -302,14 +329,13 @@
                       mov [rax], rdx
                       mov rdx, rax
                       
-                                                                       
                       jmp " both_fraction "
                       
                       " check_fraction_2-2 ":
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne ERROR_NOT_NUMBER                     
+                      jne "error_l"                     
                       " both_fraction ":
                       
                       ADD_FRACTION rdx, rbx               
@@ -319,9 +345,125 @@
                       
                       " finish_add ":
                       test_malloc 8
-                      mov [rax],rdx                      
+                      mov [rax],rdx
+                                            
                       CLEAN_STACK
                       ret
+                      " error_l ":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":
+                      ")
+      )))
+
+(define continue-l
+  (^make_label "continue_label"))
+(define add-lib-fun-b_equal
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'b_equal ftable))
+          (check_fraction_2-1 (check_fraction_l))
+          (check_fraction_2-2 (check_fraction_l))
+          (check_fraction_1-1 (check_fraction_l))
+          (both_fraction (both_fraction_l))
+          (continue (continue-l))
+          (equal_label (equal-l))
+          (finish_add (finish_add_l))
+          (error_l (error-label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rbx, qword[rbp + 5*8] ;get 2nd param
+                      ;*** check_first ***
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " check_fraction_1-1 "
+                      
+                      ;*** first: integer check second *****
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " check_fraction_2-1 "
+                      
+                      ; **** both are integer *****
+                      mov rdx, [rdx]
+                      mov rbx, [rbx]                     
+                      DATA rdx
+                      DATA rbx
+                      cmp rdx, rbx
+                      je "equal_label "
+                      mov rax, const_3                   
+                      jmp " finish_add "
+                      " check_fraction_1-1 ":
+                      mov rax, [rdx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      jne "error_l"
+                      
+                      ;**first: fraction check second **
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je " both_fraction "
+                      cmp rax, T_INTEGER
+                      jne "error_l"
+                      
+                      ; first: fraction second: integer                   
+                      mov rax, const_3
+                      jmp "finish_add"
+                      
+                      " check_fraction_2-1 ":
+                      
+                      ;first: integer check second
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER;
+                      jne " check_fraction_2-2 "
+                      ;first: integer second: fraction                      
+                      mov rax, const_3
+                      jmp " finish_add "
+                      
+                      " check_fraction_2-2 ":
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      jne "error_l"                     
+                      " both_fraction ":
+                      mov rdx, [rdx] ;first number
+                      mov rbx, [rbx] ;second number
+                      mov rax, rdx
+                      CAR rax ; mone1
+                      mov rcx, rbx
+                      CAR rcx ; mone2
+                      cmp rax, rcx
+                      je " continue "
+                      mov rax, const_3
+                      jmp "finish_add "
+                      "continue ":              
+                      mov rax, rdx
+                      CDR rax ; mone1
+                      mov rcx, rbx
+                      CDR rcx ; mone2
+                      cmp rax, rcx             
+                      mov rax, const_3
+                      jne " finish_add " 
+                      "equal_label ":        
+                      mov rax, const_4
+                      " finish_add ":                  
+                      CLEAN_STACK
+                      ret
+                      " error_l ":
+                      CLEAN_STACK
+                      jmp ERROR
                       " L ":
                       ")
       )))
@@ -409,8 +551,7 @@
                       test_malloc 8
                       mov [rax], rdx
                       mov rdx, rax
-                      
-                                                                       
+                                              
                       jmp " both_fraction "
                       
                       " check_fraction_2-2 ":
@@ -470,6 +611,67 @@
       )))
 
 
+(define add-lib-fun-not
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'not ftable))
+          (cmp_f_label (cmp_false))
+          (finish_l (finish_label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      cmp rdx, const_3
+                      jne " cmp_f_label "
+                      mov rax, const_4 ; #t
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax, const_3 ; #f
+                      " finish_l ":    
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-vector? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'vector? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
+                      TYPE rax
+                      cmp rax, T_VECTOR
+                      jne " cmp_f_label "
+                      mov rax,const_4
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,const_3
+                      " finish_l ":
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
 
 (define add-lib-fun-pair? 
   (lambda (ftable)
@@ -503,6 +705,81 @@
                       ")
       )))
 
+(define add-lib-fun-procedure? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'procedure? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
+                      TYPE rax
+                      cmp rax, T_CLOSURE
+                      jne " cmp_f_label "
+                      mov rax,const_4
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,const_3
+                      " finish_l ":
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-string? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'string? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
+                      TYPE rax
+                      cmp rax, T_STRING
+                      jne " cmp_f_label "
+                      mov rax,const_4
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,const_3
+                      " finish_l ":
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-rational? 
+  (lambda (ftable)
+     (let ((addr-src (lookup-fvar 'number? ftable))
+          (addr-dest (lookup-fvar 'rational? ftable)))
+       (string-append "
+                      mov rax, qword["addr-src"]
+                      mov qword["addr-dest"],rax
+                      "))))
+                      
+                      
+    
 (define add-lib-fun-number? 
   (lambda (ftable)
     (let ((addr (lookup-fvar 'number? ftable))
@@ -609,6 +886,38 @@
                       ")
       )))
 
+
+(define add-lib-fun-integer->char
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'integer->char ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rdx,[rdx]
+                      mov rax, rdx
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne ERROR_NOT_CHAR    
+                      test_malloc 8
+                      DATA rdx
+                      shl rdx, TYPE_BITS
+                      or rdx, T_CHAR
+                      mov [rax],rdx
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
 (define add-lib-fun-cons 
   (lambda (ftable)
     (let ((addr (lookup-fvar 'cons ftable))
@@ -668,6 +977,57 @@
                       ")
       )))
 
+(define add-lib-fun-remainder 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'remainder ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (error_l (error-label))
+         (positive (positive-label))
+         (finish_l (finish_label)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8]
+                      mov rbx, qword[rbp + 5*8]    
+                      mov rax,[rdx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " error_l "
+                      mov rax,[rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne " error_l "
+                      mov rax, [rdx]
+                      DATA rax
+                      mov r8, rax
+                      xor rdx, rdx
+                      mov rbx, [rbx]
+                      DATA rbx
+                      div rbx
+                      cmp r8, 0
+                      jg " positive "
+                      neg rdx         
+                      "positive":               
+                      MAKE_INT rdx
+                      test_malloc 8
+                      mov [rax], rdx                          
+                      jmp " finish_l"             
+                      " error_l ":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " finish_l ":
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
 
 (define add-lib-fun-integer? 
   (lambda (ftable)
@@ -759,6 +1119,144 @@
                       " cmp_f_label ":
                       mov rax,const_3
                       " finish_l ":
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define check-integer-label
+  (^make_label "check_integer"))
+
+(define add-lib-fun-numerator
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'numerator ftable))
+          (check-integer (check-integer-label))
+          (finish_l (finish_label))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
+                      mov rbx,rax
+                      TYPE rax
+                      cmp rax,T_FRACTION
+                      jne " check-integer "
+                      mov rax,rbx
+                      packed_car rax
+                      jmp "finish_l "
+                      " check-integer ":
+                      cmp rax, T_INTEGER
+                      jne ERROR_NOT_NUMBER
+                      mov rax, qword[rbp + 4*8] 
+                      "finish_l ":     
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-denominator
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'denominator ftable))
+          (check-integer (check-integer-label))
+          (finish_l (finish_label))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rax, [rax]
+                      mov rbx,rax
+                      TYPE rax
+                      cmp rax,T_FRACTION
+                      jne " check-integer "
+                      mov rax,rbx
+                      packed_cdr rax
+                      jmp "finish_l "
+                      " check-integer ":
+                      cmp rax, T_INTEGER
+                      jne ERROR_NOT_NUMBER
+                      mov rax, const_5 
+                      "finish_l ":     
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+
+(define add-lib-fun-set-cdr!
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'set-cdr! ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rbx, [rax]
+                      TYPE rbx
+                      cmp rbx,T_PAIR
+                      JNE ERROR_NOT_PAIR
+                      mov rbx, [rax]
+                      packed_car rbx
+                      mov rdx, qword[rbp + 5*8]
+                      MAKE_PAIR rbx, rdx
+                      mov [rax], rbx
+                      mov rax, const_1
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-set-car!
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'set-car! ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rbx, [rax]
+                      TYPE rbx
+                      cmp rbx,T_PAIR
+                      JNE ERROR_NOT_PAIR
+                      mov rbx, [rax]
+                      packed_cdr rbx
+                      mov rdx, qword[rbp + 5*8]
+                      MAKE_PAIR rdx, rbx
+                      mov [rax], rdx
+                      mov rax, const_1
                       CLEAN_STACK
                       ret
                       " L ":
@@ -870,7 +1368,7 @@
     (let* ((init-consts-lsts `( ,@(map ^get-consts list-exprs)))
            (init-consts (fold-left append '() init-consts-lsts))
     		(no_duplicates_list  
-       			(reverse (list->set  (reverse (append (list (void) '() #f #t 1) (split-consts init-consts '())))))))
+       			(reverse (list->set  (reverse (append (list (void) '() #f #t 1 "ERROR") (split-consts init-consts '())))))))
       no_duplicates_list)))
 
 
@@ -1490,9 +1988,19 @@
                             " (add-lib-fun-apply ftable) "
                             " (add-lib-fun-b_plus ftable) "
                             " (add-lib-fun-b_minus ftable) "
-                            "
-               
-                            
+                            " (add-lib-fun-vector? ftable) "
+                            " (add-lib-fun-rational? ftable) "
+                            " (add-lib-fun-string? ftable) "
+                            " (add-lib-fun-procedure? ftable) "
+                            " (add-lib-fun-numerator ftable) "
+                            " (add-lib-fun-denominator ftable) "
+                            " (add-lib-fun-set-car! ftable) "
+                            " (add-lib-fun-set-cdr! ftable) "
+                            " (add-lib-fun-remainder ftable) "
+                            " (add-lib-fun-integer->char ftable) "
+                            " (add-lib-fun-not ftable) "
+                            " (add-lib-fun-b_equal ftable) "
+                            "                
                 ))
            
            (asm-code (code-gen-fromlst lst-exprs (car ctable) ftable "\n"))
@@ -1515,10 +2023,25 @@
                 push rbp
           	    mov rbp, rsp
                 ~A
+                jmp END
                 ERROR_NOT_CHAR:
+                   add rsp, 8 ;clean return addr
+                   jmp END
                 ERROR_NOT_CLOSURE:
+                   add rsp, 8 ;clean return 
+                   jmp END
                 ERROR_NOT_PAIR:
+                   add rsp, 8 ;clean return addr
+                   jmp END
                 ERROR_NOT_NUMBER:
+                   add rsp, 8 ;clean return addr
+                   jmp END
+                ERROR:
+                   push const_6
+                   call write_sob_if_not_void
+                   add rsp, 16 ;clean error msg + return addr
+                   jmp END
+                END:
                 add rsp, 5*8
           	    ret\n" asm-ctable asm-ftable asm-lib-func asm-code))
           	)
