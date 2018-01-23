@@ -102,10 +102,10 @@
 (define finish_add_l
   (^make_label "finish_add"))
 
-; append (variadic), apply (not variadic), < (variadic), = (variadic), > (variadic), + (variadic), /
+; append (variadic), < (variadic), = (variadic), > (variadic), /
 ; (variadic), * (variadic), - (variadic), denominator,
-; integer->char, list (variadic), make-string, make-vector, map (variadic), not,
-;  number?, numerator,  procedure?, rational?, remainder, set-car!, set-cdr!,
+; integer->char, make-string, make-vector, map (variadic), not,
+; number?, numerator,  procedure?, rational?, remainder, set-car!, set-cdr!,
 ; string-length, string-ref, string-set!, string->symbol, string?, symbol?, symbol->string,
 ; vector, vector-length, vector-ref, vector-set!, vector?
 
@@ -1503,7 +1503,7 @@
           	section .text
           	\tmain:
                 mov rax, malloc_pointer
-				mov qword [rax], start_of_data2
+				        mov qword [rax], start_of_data2
                 ~A
                 push const_2
                 mov rax, 0
