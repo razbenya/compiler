@@ -243,6 +243,8 @@
 (define both_fraction_l
   (^make_label "both_fraction"))
 
+(define int_with_fract_l
+  (^make_label "int_with_fract"))
 
 (define add-lib-fun-b_plus
   (lambda (ftable)
@@ -250,6 +252,7 @@
           (check_fraction_2-1 (check_fraction_l))
           (check_fraction_2-2 (check_fraction_l))
           (check_fraction_1-1 (check_fraction_l))
+          (int_with_fract (int_with_fract_l))
           (both_fraction (both_fraction_l))
           (finish_add (finish_add_l))
           (error_l (error-label))
@@ -295,6 +298,7 @@
                       jne "error_l"
                       
                       ;**first: fraction check second **
+
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
@@ -302,35 +306,29 @@
                       cmp rax, T_INTEGER
                       jne "error_l"
                       
-                      ; first: fraction second: integer                   
-                      
-                      mov rax, const_5                 
-                      MAKE_FRACTION rbx, rax
-                      test_malloc 8
-                      mov [rax], rbx
-                      mov rbx, rax
-                                         
-                      jmp " both_fraction "
-                      
+                      ; first: fraction second: integer
+
+                      jmp " int_with_fract "
+
                       " check_fraction_2-1 ":
                       
                       ;first: integer check second
+
                       mov rax, [rbx]
                       TYPE rax
-                      cmp rax, T_INTEGER
-                      jne " check_fraction_2-2 "
+                      cmp rax, T_FRACTION
+                      jne " error_l "
+
                       ;first: integer second: fraction
-                                               
-                      mov rax, const_5                 
-                      MAKE_FRACTION rdx, rax
-                      
-                      test_malloc 8
-                      mov [rax], rdx
-                      mov rdx, rax
-                      
-                      jmp " both_fraction "
-                      
+                      ;change between rbx and rdx
+                      mov r8, rdx
+                      mov rdx, rbx
+                      mov rbx, r8
+
+                      jmp "int_with_fract "
+                  
                       " check_fraction_2-2 ":
+
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
@@ -341,7 +339,34 @@
                       MAKE_FRACTION rdx, rbx
                       REDUCE rdx
                       REMOVE_FRACTION rdx              
-                      
+                      jmp " finish_add "
+
+                      " int_with_fract ":
+                      ;fraction in rdx, integer in rbx
+                      mov r11,[rdx] ;- fraction
+                      mov r9, [rbx] ;- integer 3
+                      mov rax,r11 ; fraction
+                      CAR r11 ; addr mone fraction
+                      DATA r11 ; value mone fraction 1
+                      CDR rax ; addr mechane fraction
+                      mov rbx,rax; save mechane addr
+                      DATA rax ; value mechane fraction 2
+                      xor rdx,rdx
+                      DATA r9; value integer
+                      mul r9 
+                      add rax, r11 ; new mone
+                      mov r9, rax
+                      MAKE_INT r9
+                      test_malloc 8
+                      mov [rax], r9
+                      mov rdx, rax 
+                      test_malloc 8
+                      mov [rax], rbx
+                      mov rbx, rax
+                      MAKE_FRACTION rdx, rbx
+                      REDUCE rdx
+                      REMOVE_FRACTION rdx 
+
                       " finish_add ":
                       test_malloc 8
                       mov [rax],rdx
