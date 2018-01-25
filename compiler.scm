@@ -127,6 +127,7 @@
      
     '(define list (lambda x x))
     
+    
     '(define + 
         (lambda x 
           (cond ((null? x) 0)
@@ -180,10 +181,8 @@
                       jne "error_l"
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
-                      
                       mov rdx,[rdx]
-                      mov rbx,[rbx]    
-                          
+                      mov rbx,[rbx]                          
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_CLOSURE
@@ -1678,21 +1677,14 @@
                         "
                         mov rax, [rbp + 8*2] ;env
                         mov rdi, 0
-                        "
-                        loop_enter1 ":
-                        cmp rdi, " (number->string major)
-                        "
-                        je " loop_exit1
-                        "
-                        mov r10, [rax + rdi*8]"              ;; for(i=0;i<m;i++)
-                        "
-                        mov [rbx + rdi*8 + 1*8], r10"       ;;  env'[i+1] = env[i]    
-                        "
+                        " loop_enter1 ":
+                        cmp rdi, " (number->string major) "
+                        je " loop_exit1 " 
+                        mov r10, [rax + rdi*8]              ;; for(i=0;i<m;i++)
+                        mov [rbx + rdi*8 + 1*8], r10        ;;  env'[i+1] = env[i]    
                         inc rdi
-                        jmp " loop_enter1
-                        "
-                        "
-                        loop_exit1 ":
+                        jmp " loop_enter1 "
+                        " loop_exit1 ":
                         mov r8, [rbp+8*3] ;n
                         add r8,1
                         mov r9, r8
@@ -1700,20 +1692,15 @@
                         test_malloc r9
                         mov rcx , rax
                         mov rdi, 0
-                        "
-                        loop_enter2 ":
+                        " loop_enter2 ":
                         cmp rdi , r8
-                        je " loop_exit2
-                        "
+                        je " loop_exit2 "
                         mov r9, [rbp + (4+rdi) * 8]
                         mov [rcx + rdi*8], r9 
-                        "               ;; for (i=0; i<n ; i++) rcx[i] = param[i], sub 3*8 to get param and rdi(i) * 8 for param i
-                        "
+                        ;; for (i=0; i<n ; i++) rcx[i] = param[i], sub 3*8 to get param and rdi(i) * 8 for param i
                         inc rdi
-                        jmp " loop_enter2
-                        "
-                        "
-                        loop_exit2 ":
+                        jmp " loop_enter2 "
+                        " loop_exit2 ":
                         mov [rbx], rcx
                         "
                     )))
@@ -1721,21 +1708,16 @@
                 (let ((closure_label (make_closure_label)))
                 (string-append
                     "
-                   test_malloc 16
+                    test_malloc 16
                     MAKE_LITERAL_CLOSURE rax, rbx, " B "
-                    ;mov rax,[rax]
-                    jmp " L
-                    "
-                    "
-                    B ":
+                    jmp " L "
+                    " B ":
                     push rbp
                     mov rbp, rsp
-                    "
-                    (code-gen (caddr expr) (+ 1 major) ctable ftable) "
+                    " (code-gen (caddr expr) (+ 1 major) ctable ftable) "
                     CLEAN_STACK
                     ret
-                    "
-                    L ":
+                    " L ":
                     "
                     ))))
                     
@@ -1767,21 +1749,14 @@
                         "
                         mov rax, [rbp + 8*2] ;env
                         mov rdi, 0
-                        "
-                        loop_enter1 ":
-                        cmp rdi, " (number->string major)
-                        "
-                        je " loop_exit1
-                        "
-                        mov r10, [rax + rdi*8]"              ;; for(i=0;i<m;i++)
-                        "
-                        mov [rbx + rdi*8 + 1*8], r10"       ;;  env'[i+1] = env[i]    
-                        "
+                        " loop_enter1 ":
+                        cmp rdi, " (number->string major) "
+                        je " loop_exit1 " 
+                        mov r10, [rax + rdi*8]            ;; for(i=0;i<m;i++)
+                        mov [rbx + rdi*8 + 1*8], r10       ;;  env[i+1] = env[i]    
                         inc rdi
-                        jmp " loop_enter1
-                        "
-                        "
-                        loop_exit1 ":
+                        jmp " loop_enter1 "
+                        " loop_exit1 ":
                         mov r8, [rbp+8*3] ;n
                         add r8, 1
                         mov r9, r8
@@ -1789,20 +1764,15 @@
                         test_malloc r9
                         mov rcx , rax
                         mov rdi, 0
-                        "
-                        loop_enter2 ":
+                        " loop_enter2 ":
                         cmp rdi , r8
-                        je " loop_exit2
-                        "
+                        je " loop_exit2 "
                         mov r9, [rbp + (4+rdi) * 8]
                         mov [rcx + rdi*8], r9 
-                        "               ;; for (i=0; i<n ; i++) rcx[i] = param[i], sub 3*8 to get param and rdi(i) * 8 for param i
-                        "
+              			;; for (i=0; i<n ; i++) rcx[i] = param[i], sub 3*8 to get param and rdi(i) * 8 for param i
                         inc rdi
-                        jmp " loop_enter2
-                        "
-                        "
-                        loop_exit2 ":
+                        jmp " loop_enter2 "
+                        " loop_exit2 ":
                         mov [rbx], rcx
                         "
                     )))
@@ -1812,10 +1782,8 @@
                     "
                     test_malloc 16
                     MAKE_LITERAL_CLOSURE rax, rbx, " B "
-                    jmp " L
-                    "
-                    "
-                    B ":
+                    jmp " L "
+                    " B ":
                     push rbp
                     mov rbp, rsp
                     mov r8, [rbp+3*8] ;n
@@ -1840,14 +1808,12 @@
                     jmp " loop_enter "
                     " loop_exit ":
                     mov [rbp + "(number->string (* 8 (+ 4 fix-params)))"], rax
-                    "
-                    (code-gen (cadddr expr) (+ 1 major) ctable ftable) "
+                    " (code-gen (cadddr expr) (+ 1 major) ctable ftable) "
                     CLEAN_STACK
                     ret
+                    " L ":
                     "
-                    L ":
-                    "
-                    ))))
+                ))))
                     
                 (string-append epilog extend-env make-closure))
             ))
@@ -1868,9 +1834,8 @@
                     "))
                 (handle-proc
                     (string-append (code-gen proc major ctable ftable) "
-                                    mov rbx, rax
-                                    mov rbx, [rbx]
                                     mov rax, [rax]
+                                    mov rbx, rax
                                     TYPE rax
                                     cmp rax, T_CLOSURE
                                     JNE ERROR_NOT_CLOSURE
@@ -1919,14 +1884,12 @@
                                     mov r10, r11
                                     add r10, 5
                                     shl r10, 3                                  
-                                    add r10,r8 ; r8 + 8 * (5+n)
-                                    .label_4:                                                                    
+                                    add r10,r8 ; r8 + 8 * (5+n)                                                                  
                                     " loop_enter ":
                                     cmp rdi, " (number->string (+ 4 (length params))) "
                                     je " loop_exit "
                                     sub r8, 8
-                                    sub r10,8
-                                    .debug:              
+                                    sub r10,8             
                                     mov r9, [r8]
                                     mov [r10], r9
                                     inc rdi
@@ -1934,8 +1897,7 @@
                                     " loop_exit ":                                    
                                     add r12, 4+1
                                     shl r12, 3 ;(4+n)*8
-                                    add rsp, r12  
-                                    .test:                      
+                                    add rsp, r12                       
                                     CLOSURE_CODE rax
                                     jmp rax
                                     ")))
@@ -2017,7 +1979,7 @@
           	section .text
           	\tmain:
                 mov rax, malloc_pointer
-				        mov qword [rax], start_of_data2
+				mov qword [rax], start_of_data2
                 ~A
                 push const_2
                 mov rax, 0
@@ -2054,5 +2016,4 @@
   			
      		 (string->file asm-output out)
         		(display asm-output)
-         )))
-                
+         )))                
