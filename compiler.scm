@@ -1573,7 +1573,7 @@
                 mov rbx,rax
                 ~A
                 mov qword[rax],rbx
-                mov rax,qword[const_1]
+                mov rax,const_1
                 " (code-gen value major ctable ftable) (code-gen var major ctable ftable)))))
   
   (define code-gen-box-get 
