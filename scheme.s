@@ -70,13 +70,13 @@
 %endmacro
 
 %macro CLEAN_STACK 0
-	mov rbx, [rbp + 3*8]                                                
-    pop rbp
-    pop rdx
+	mov rbx, [rbp + 3*8]  ; n                                              
+    leave
+    pop rdx   ;save return 
     shl rbx,3 
-    add rbx,24                                              
-    add rsp, rbx
-    push rdx
+    add rbx, 8*3                                              
+    add rsp, rbx ; clen stack
+    push rdx ; push return
 %endmacro
 
 %macro NEG_FRACTION 1

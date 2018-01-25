@@ -1892,15 +1892,15 @@
                (push-params 
                 (string-append "
                     mov rax, const_2
-                    push rax
+                    push rax           
                     "
                     (string-join-end (map (lambda (p) (code-gen p major ctable ftable)) (reverse params)) "\npush rax\n")
                     "
                     mov rax, " (number->string (length params)) "
-                    push rax
+                    push rax                                           
                     "))
                 (handle-proc
-                    (string-append (code-gen proc major ctable ftable) "
+                    (string-append (code-gen proc major ctable ftable) "                     
                                     mov rax,[rax]
                                     mov rbx, rax
                                     TYPE rax
@@ -1908,32 +1908,38 @@
                                     JNE ERROR_NOT_CLOSURE
                                     mov rax, rbx
                                     CLOSURE_ENV rbx
-                                    push rbx
-                                    mov r11, qword[rbp + 8*3] ;n                                    
+                                    push rbx             
+                                    mov r11, qword[rbp + 8*3] ;n
+                                    mov r12, r11                                  
                                     mov r8,rbp
-                                    mov rbp,[rbp]                                                                 
+                                    mov rbp,[rbp] ; rbp <= old rbp                                                                 
                                     mov rbx, [r8+8] ; old ret
                                     push rbx
-                                    mov rdi,1
-                                    mov r10,rbp                                   
+                                    mov rdi,0
+                                    mov r10, r11
+                                    add r10, 5
+                                    shl r10, 3                                  
+                                    add r10,r8 ; r8 + 8 * (5+n)
+                                    .label_4:                                                                    
                                     " loop_enter ":
-                                    cmp rdi, " (number->string (+ 5 (length params))) "
+                                    cmp rdi, " (number->string (+ 4 (length params))) "
                                     je " loop_exit "
                                     sub r8, 8
-                                    mov r9, [r8]
                                     sub r10,8
+                                    .debug:              
+                                    mov r9, [r8]
                                     mov [r10], r9
                                     inc rdi
                                     jmp " loop_enter "
                                     " loop_exit ":                                    
-                                    add r11, 4+1
-                                    shl r11, 3 ; (4+n+1)*8
-                                    add rsp, r11                                                          
+                                    add r12, 4+1
+                                    shl r12, 3 ;(4+n)*8
+                                    add rsp, r12  
+                                    .test:                      
                                     CLOSURE_CODE rax
                                     jmp rax
                                     ")))
-                (string-append push-params handle-proc))))     
-        
+                (string-append push-params handle-proc))))  
 
 ;iterate over the list of exprs and call code-gen for each exprs, appending to it end the expected finish - result in rax, printing if not void, clean.
 (define code-gen-fromlst
