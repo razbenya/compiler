@@ -126,8 +126,33 @@
   (list 
      
     '(define list (lambda x x))
-    
-    
+
+    '(define >
+      (lambda (x . y)
+        (if (null? y)
+          #t
+          (letrec ((bigger?
+                     (lambda (x y rest)
+                        (if (null? rest) 
+                          (positive? (- x y))
+                          (and (positive? (- x y))
+                            (bigger? y (car rest) (cdr rest)))))))
+          (bigger? x (car y) (cdr y))))))
+
+    '(define <
+      (lambda (x . y)
+        (if (null? y)
+          #t
+          (letrec ((bigger?
+                  (lambda (x y rest)
+                    (if (null? rest) 
+                      (and (not (positive? (- x y))) 
+                            (not (zero? (- x y))))
+                      (and (not (positive? (- x y))) 
+                            (not (zero? (- x y)))
+                           (bigger? y (car rest) (cdr rest)))))))
+          (bigger? x (car y) (cdr y))))))
+
     '(define + 
         (lambda x 
           (cond ((null? x) 0)
@@ -151,7 +176,7 @@
 (define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
                      cons char->integer integer->char null? pair? zero? number? numerator
                      apply b_plus b_minus vector? rational? string? procedure? 
-                     set-car! set-cdr! not b_equal )) ;todo add lib funcs
+                     set-car! set-cdr! not b_equal > <)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -245,6 +270,69 @@
 
 (define int_with_fract_l
   (^make_label "int_with_fract"))
+
+(define negative_l
+  (^make_label "negative"))
+
+(define test_l
+  (^make_label "test"))
+
+(define add-lib-fun-positive?
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'positive? ftable))
+      (negative (negative_l))
+      (positive (positive-label))
+      (test_integer (test_l))
+      (test_fraction (test_l))
+      (finish_l (finish_label))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      je "test_integer"
+                      mov rax, [rdx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je "test_fraction"
+                      jmp "error_l"
+                      "test_integer ":
+                      mov rax, [rdx]
+                      DATA rax
+                      cmp rax,0
+                      jg "positive"
+                      mov rax, const_3
+                      jmp "finish_l"
+                      "test_fraction":
+                      mov rax, [rdx]
+                      CAR rax
+                      DATA rax
+                      cmp rax,0
+                      jg "positive"
+                      mov rax,const_3
+                      jmp "finish_l"
+                      "positive":
+                      mov rax, const_4
+                      jmp "finish_l"
+                      "finish_l":
+                      CLEAN_STACK
+                      ret
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":"
+      ))))
 
 (define add-lib-fun-b_plus
   (lambda (ftable)
@@ -1993,6 +2081,7 @@
                             " (add-lib-fun-integer->char ftable) "
                             " (add-lib-fun-not ftable) "
                             " (add-lib-fun-b_equal ftable) "
+                            " (add-lib-fun-positive? ftable) "
                             "                
                 ))
            
