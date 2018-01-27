@@ -111,7 +111,7 @@
 (define equal-l
   (^make_label "equal"))
 
-; append (variadic), < (variadic), > (variadic), 
+; append (variadic), 
 ;/ (variadic), * (variadic),
 ; make-string, make-vector, map (variadic),
 ; string-length, string-ref, string-set!, string->symbol, symbol?, symbol->string,
@@ -153,6 +153,11 @@
                            (bigger? y (car rest) (cdr rest)))))))
           (bigger? x (car y) (cdr y))))))
 
+    '(define *
+        (lambda x 
+          (cond ((null? x) 1)
+            (else (b_mul (car x) (apply * (cdr x)))))))
+
     '(define + 
         (lambda x 
           (cond ((null? x) 0)
@@ -176,7 +181,7 @@
 (define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
                      cons char->integer integer->char null? pair? zero? number? numerator
                      apply b_plus b_minus vector? rational? string? procedure? 
-                     set-car! set-cdr! not b_equal > <)) ;todo add lib funcs
+                     set-car! set-cdr! not b_equal > < b_mul)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -333,6 +338,113 @@
                       jmp ERROR
                       " L ":"
       ))))
+
+(define multiple_l
+  (^make_label "multiple"))
+
+(define compare_second_l
+  (^make_label "compare_second"))
+
+(define add-lib-fun-b_mul
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'b_mul ftable))
+          (compare_second (compare_second_l))
+          (multiple (multiple_l))
+          (error_l (error-label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rbx, qword[rbp + 5*8] ;get 2nd param
+                      ;*** check_first ***
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je " compare_second "
+                      cmp rax, T_INTEGER
+                      jne " error_l "
+                      ;*** change one to fraction ***
+
+                      mov rax, const_5                 
+                      MAKE_FRACTION rdx, rax
+                      test_malloc 8
+                      mov [rax], rdx
+                      mov rdx, rax
+
+                      ;*** check second ***
+                      "compare_second ":
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je "multiple"
+                      cmp rax, T_INTEGER
+                      jne " error_l "
+
+                      ;***change second to fraction ***
+                      mov rax, const_5                 
+                      MAKE_FRACTION rbx, rax
+                      test_malloc 8
+                      mov [rax], rbx
+                      mov rbx, rax
+
+                      ;***both are fractions time to multiple
+                      "multiple":
+                      ;get mone a get mone b multiple
+                      ;get mechane a get mechane b multiple
+
+                      
+                      mov r8, rdx ; free rdx for use
+                      mov rax, [r8]; a 
+                      mov r9, [rbx] ; b
+                      CAR rax ; mone a
+                      CAR r9 ; mone b
+                      DATA rax ; data from int a
+                      DATA r9 ; data from int b
+                      xor rdx, rdx
+                      mul r9 ; rax * r9 (mone a * mone b) - ans in rdx
+                      mov rdx, rax
+                      MAKE_INT rdx
+                      test_malloc 8
+                      mov [rax], rdx
+                      mov rcx, rax ; int for new mone
+                      mov rax, [r8]; a
+                      mov r9, [rbx]; b
+                      CDR rax ; mechane a
+                      CDR r9 ; mechane b
+                      DATA rax ; data from int a
+                      DATA r9  ; data from int b
+                      xor rdx, rdx
+                      mul r9
+                      mov rdx, rax
+                      MAKE_INT rdx
+                      test_malloc 8
+                      mov [rax], rdx
+                      mov rbx, rax ; int for new mechane
+                      check4:
+                      MAKE_FRACTION rcx, rbx
+                      REDUCE rcx
+                      REMOVE_FRACTION rcx
+                      test_malloc 8
+                      mov [rax],rcx      
+                      CLEAN_STACK
+                      ret
+                      " error_l ":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":
+                      ")
+      )))          
+
+
+
 
 (define add-lib-fun-b_plus
   (lambda (ftable)
@@ -2082,6 +2194,7 @@
                             " (add-lib-fun-not ftable) "
                             " (add-lib-fun-b_equal ftable) "
                             " (add-lib-fun-positive? ftable) "
+                            " (add-lib-fun-b_mul ftable)"
                             "                
                 ))
            
