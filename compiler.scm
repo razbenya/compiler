@@ -113,7 +113,7 @@
 
 ; append (variadic), map (variadic), make-string, make-vector,
 ; string-ref, string-set!, string->symbol, symbol?, symbol->string,
-; vector, vector-length, vector-ref, vector-set!,
+; vector, vector-ref, vector-set!,
 
 (define scheme-functions 
  (map (lambda(e) 
@@ -186,11 +186,13 @@
   ))
 )
 
+
 (define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
                      cons char->integer integer->char null? pair? zero? number? numerator
                      apply b_plus b_minus vector? rational? string? procedure? 
                      set-car! set-cdr! not b_equal > < b_mul
-                     b_div string-length vector-length)) ;todo add lib funcs
+                     b_div string-length vector-length
+                     vector-ref)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -290,6 +292,49 @@
 
 (define test_l
   (^make_label "test"))
+
+
+(define add-lib-fun-vector-ref
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'vector-ref ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rbx, qword[rbp + 5*8] ;get second param
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_VECTOR
+                      jne "error_l"
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne "error_l"
+                      mov rbx, [rbx]
+                      mov rdx, [rdx]
+                      DATA rbx
+                      test_malloc 8
+                      mov r8, rax
+                      VECTOR_REF r8,rdx,rbx
+                      check:
+                      test_malloc 8
+                      mov [rax], r8
+                      CLEAN_STACK
+                      ret
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":"
+      ))))
 
 (define add-lib-fun-vector-length
   (lambda (ftable)
@@ -2375,6 +2420,7 @@
                             " (add-lib-fun-b_div ftable)"
                             " (add-lib-fun-string-length ftable)"
                             " (add-lib-fun-vector-length ftable)"
+                            " (add-lib-fun-vector-ref ftable)"
                             "
                 ))
            
