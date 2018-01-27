@@ -157,6 +157,15 @@
           (cond ((null? x) 1)
             (else (b_mul (car x) (apply * (cdr x)))))))
 
+    '(define / 
+        (lambda (x . y)
+          (letrec ((iter 
+                     (lambda (acc x . z)
+                        (if (null? z) (b_div acc x)
+                            (apply iter (cons (b_div acc x) z))))))
+          (if (null? y) (b_div 1 x)
+                       (apply iter (cons x y))))))
+
     '(define + 
         (lambda x 
           (cond ((null? x) 0)
@@ -180,7 +189,8 @@
 (define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
                      cons char->integer integer->char null? pair? zero? number? numerator
                      apply b_plus b_minus vector? rational? string? procedure? 
-                     set-car! set-cdr! not b_equal > < b_mul)) ;todo add lib funcs
+                     set-car! set-cdr! not b_equal > < b_mul
+                     b_div)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -343,6 +353,137 @@
 
 (define compare_second_l
   (^make_label "compare_second"))
+
+(define divide_l
+  (^make_label "divide"))
+
+(define add-lib-fun-b_div
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'b_div ftable))
+          (compare_second (compare_second_l))
+          (divide (divide_l))
+          (multiple (multiple_l))
+          (switch (divide_l))
+          (error_l (error-label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rbx, qword[rbp + 5*8] ;get 2nd param
+                      ;*** check_first ***
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je " compare_second "
+                      cmp rax, T_INTEGER
+                      jne " error_l "
+                      ;*** change one to fraction ***
+
+                      mov rax, const_5                 
+                      MAKE_FRACTION rdx, rax
+                      test_malloc 8
+                      mov [rax], rdx
+                      mov rdx, rax
+
+                      ;*** check second ***
+                      "compare_second ":
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_FRACTION
+                      je "switch"
+                      cmp rax, T_INTEGER
+                      jne " error_l "
+                      ;this is integer - divide in zero handling
+                      mov rax, [rbx]
+                      DATA rax
+                      cmp rax, 0
+                      je " error_l "
+
+                      ;***change second to fraction ***
+                      mov rax, const_5                 
+                      MAKE_FRACTION rbx, rax
+                      test_malloc 8
+                      mov [rax], rbx
+                      mov rbx, rax
+
+                      ;***both are fractions time to divide
+                      "switch":
+                      ;***first switch second mone with mechane
+                      mov r8, [rbx]
+                      CAR r8 ;mone
+                      mov rcx, r8 ; check if negative
+                      DATA rcx
+                      cmp rcx, 0
+                      jg "divide"
+                      ;***Change negative
+                      mov r10, rdx
+                      mov rax, rcx ;old mone
+                      mov rcx, -1
+                      mul rcx
+                      mov rcx, rax
+                      MAKE_INT rcx
+                      test_malloc 8
+                      mov [rax], rcx
+                      mov r9, rax ;new mechane
+                      mov rax, [rbx]
+                     
+                      CDR rax ; old mechane
+                      DATA rax
+                      mov rcx, -1
+                      mul rcx
+                      mov r8, rax
+                      MAKE_INT r8
+                      test_malloc 8
+                      mov [rax], r8
+                      mov rbx, rax ; new mone
+                      MAKE_FRACTION rbx, r9                     
+                      test_malloc 8
+                      mov [rax], rbx
+                      mov rbx, rax ; put new second in rbx
+                      mov rdx, r10
+                      jmp "multiple"
+                      
+                      "divide":
+                      mov r8, [rbx]
+                      mov rbx, [rbx]
+                      CDR rbx ; mone
+                      CAR r8 ; mechane
+                      test_malloc 8
+                      mov [rax], r8
+                      mov r8, rax
+                      test_malloc rbx
+                      mov [rax], rbx
+                      mov rbx, rax
+                      MAKE_FRACTION rbx, r8 ; switch mone and mechane
+                      test_malloc 8
+                      mov [rax], rbx
+                      mov rbx, rax ; put new second in rbx
+                      
+                      ;***all ready time to multiple
+                      "multiple":
+                      MUL_FRACTION rdx, rbx
+                      MAKE_FRACTION rdx, rbx
+                      REDUCE rdx
+                      REMOVE_FRACTION rdx
+                      test_malloc 8
+                      mov [rax],rdx      
+                      CLEAN_STACK
+                      ret
+                      " error_l ":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":
+                      ")
+      ))) 
+
 
 (define add-lib-fun-b_mul
   (lambda (ftable)
@@ -2163,7 +2304,8 @@
                             " (add-lib-fun-b_equal ftable) "
                             " (add-lib-fun-positive? ftable) "
                             " (add-lib-fun-b_mul ftable)"
-                            "                
+                            " (add-lib-fun-b_div ftable)"
+                            "              
                 ))
            
            (asm-code (code-gen-fromlst lst-exprs (car ctable) ftable "\n"))
