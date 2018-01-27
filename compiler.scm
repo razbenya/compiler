@@ -112,7 +112,7 @@
   (^make_label "equal"))
 
 ; append (variadic), map (variadic), make-string, make-vector,
-; string-length, string-ref, string-set!, string->symbol, symbol?, symbol->string,
+; string-ref, string-set!, string->symbol, symbol?, symbol->string,
 ; vector, vector-length, vector-ref, vector-set!,
 
 (define scheme-functions 
@@ -190,7 +190,7 @@
                      cons char->integer integer->char null? pair? zero? number? numerator
                      apply b_plus b_minus vector? rational? string? procedure? 
                      set-car! set-cdr! not b_equal > < b_mul
-                     b_div string-length)) ;todo add lib funcs
+                     b_div string-length vector-length)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -291,11 +291,43 @@
 (define test_l
   (^make_label "test"))
 
+(define add-lib-fun-vector-length
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'vector-length ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rax, [rdx] 
+                      TYPE rax
+                      cmp rax, T_VECTOR
+                      jne "error_l"
+                      mov rcx, [rdx]
+                      VECTOR_LENGTH rcx
+                      MAKE_INT rcx
+                      test_malloc 8
+                      mov [rax], rcx
+                      CLEAN_STACK
+                      ret
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":"
+      ))))
+
 
 (define add-lib-fun-string-length
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'string-length ftable))
-      (finish_l (finish_label))
       (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
@@ -2342,7 +2374,8 @@
                             " (add-lib-fun-b_mul ftable)"
                             " (add-lib-fun-b_div ftable)"
                             " (add-lib-fun-string-length ftable)"
-                            "             
+                            " (add-lib-fun-vector-length ftable)"
+                            "
                 ))
            
            (asm-code (code-gen-fromlst lst-exprs (car ctable) ftable "\n"))

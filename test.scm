@@ -383,3 +383,8 @@
 ; (string-length "1")
 ; (string-length "2aavd%da")
 ; (string-length "")
+
+(vector-length #(1 2 3))
+(vector-length #(#f))
+(vector-length #("a" "b" 1 2))
+(vector-length #((1) (2 3 3) #t))
