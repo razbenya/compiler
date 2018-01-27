@@ -110,6 +110,49 @@
 %endmacro
 
 ;; rdx = addr first rbx = addr sec
+%macro MUL_FRACTION 2
+	mov qword[a], %1
+	mov qword[b], %2
+	mov r8, [%1] ;first fraction
+	mov r9, [%2] ;sec fraction
+
+	CAR r8	; mone 1
+	DATA r8
+
+	CAR r9  ; mone 2
+	DATA r9
+
+	mov rax, r8
+	mul r9 ; rax <- mone1 * mone2
+	mov r9, rax 
+	MAKE_INT r9
+	test_malloc 8
+	mov [rax], r9
+	mov r9, rax ; r9 new mone
+	mov %1, qword[a]
+	mov %2, qword[b]
+	mov rax, [%1] ;first fraction
+	mov r8, [%2] ;sec fraction
+	CDR rax	; mechane 2
+	DATA rax
+	CDR r8  ; mechane 2
+	DATA r8
+	mul r8
+	mov r8, rax ; r8 <- new mechane
+	MAKE_INT r8
+	
+	test_malloc 8
+	mov [rax], r8
+	mov %1, r9
+	mov %2, rax
+
+%endmacro
+
+
+
+
+
+;; rdx = addr first rbx = addr sec
 %macro ADD_FRACTION 2
 	mov qword[a], %1
 	mov qword[b], %2

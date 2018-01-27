@@ -111,8 +111,7 @@
 (define equal-l
   (^make_label "equal"))
 
-; append (variadic), 
-;/ (variadic), * (variadic),
+; append (variadic), / (variadic),
 ; make-string, make-vector, map (variadic),
 ; string-length, string-ref, string-set!, string->symbol, symbol?, symbol->string,
 ; vector, vector-length, vector-ref, vector-set!,
@@ -397,43 +396,12 @@
 
                       ;***both are fractions time to multiple
                       "multiple":
-                      ;get mone a get mone b multiple
-                      ;get mechane a get mechane b multiple
-
-                      
-                      mov r8, rdx ; free rdx for use
-                      mov rax, [r8]; a 
-                      mov r9, [rbx] ; b
-                      CAR rax ; mone a
-                      CAR r9 ; mone b
-                      DATA rax ; data from int a
-                      DATA r9 ; data from int b
-                      xor rdx, rdx
-                      mul r9 ; rax * r9 (mone a * mone b) - ans in rdx
-                      mov rdx, rax
-                      MAKE_INT rdx
+                      MUL_FRACTION rdx, rbx
+                      MAKE_FRACTION rdx, rbx
+                      REDUCE rdx
+                      REMOVE_FRACTION rdx
                       test_malloc 8
-                      mov [rax], rdx
-                      mov rcx, rax ; int for new mone
-                      mov rax, [r8]; a
-                      mov r9, [rbx]; b
-                      CDR rax ; mechane a
-                      CDR r9 ; mechane b
-                      DATA rax ; data from int a
-                      DATA r9  ; data from int b
-                      xor rdx, rdx
-                      mul r9
-                      mov rdx, rax
-                      MAKE_INT rdx
-                      test_malloc 8
-                      mov [rax], rdx
-                      mov rbx, rax ; int for new mechane
-                      check4:
-                      MAKE_FRACTION rcx, rbx
-                      REDUCE rcx
-                      REMOVE_FRACTION rcx
-                      test_malloc 8
-                      mov [rax],rcx      
+                      mov [rax],rdx      
                       CLEAN_STACK
                       ret
                       " error_l ":
