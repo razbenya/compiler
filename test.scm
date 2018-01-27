@@ -397,3 +397,10 @@
 ; (vector-ref #(#f "a" 4 (1 2 3)) 1)
 ; (vector-ref #(#f "a" 4 (1 2 3)) 2)
 ; (vector-ref #(#f "a" 4 (1 2 3)) 3)
+
+; (string-ref "abc" 0)
+; (string-ref "abc" 1)
+; (string-ref "abc" 2)
+; (string-ref "1adc3" 0)
+; (string-ref "1adc3" 2)
+; (string-ref "1adc3" 4)

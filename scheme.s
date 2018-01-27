@@ -292,6 +292,11 @@
 	or %1, T_INTEGER
 %endmacro 
 
+%macro MAKE_CHAR 1
+	shl %1, TYPE_BITS
+	or %1, T_CHAR
+%endmacro 
+
 %macro MAKE_FRACTION 2
 	sub %1, start_of_data
 	shl %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS)
