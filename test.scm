@@ -378,3 +378,8 @@
 ; (/ 4 -2 1)
 ; (/ 5/3 2/4 -1/3 4/3)
 ; (/ 5/3 -2/4 1/9 -4/3)
+
+; (string-length "aaa")
+; (string-length "1")
+; (string-length "2aavd%da")
+; (string-length "")
