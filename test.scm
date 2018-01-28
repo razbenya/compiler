@@ -404,3 +404,10 @@
 ; (string-ref "1adc3" 0)
 ; (string-ref "1adc3" 2)
 ; (string-ref "1adc3" 4)
+
+
+;(append)
+;(append '(1 2))
+;(append '(1 2) '(3 4))
+;(append '(1) '(2) '(3))
+;(append '(1 2 3) '(4 5 6) '(7 8 9) '(10 11 12))

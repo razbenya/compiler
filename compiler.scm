@@ -111,7 +111,7 @@
 (define equal-l
   (^make_label "equal"))
 
-; append (variadic), map (variadic), make-string, make-vector,
+; map (variadic), make-string, make-vector,
 ; string-set!, string->symbol, symbol?, symbol->string,
 ; vector, vector-set!,
 
@@ -124,6 +124,17 @@
   (list 
      
     '(define list (lambda x x))
+    
+    '(define append 
+        (lambda x
+          (letrec ((b_append 
+                      (lambda (lst1 lst2)
+                          (if (null? lst1)
+                              lst2
+                              (cons (car lst1) (b_append (cdr lst1) lst2))))))
+              (if (null? x) x
+                  (b_append (car x) (apply append (cdr x))))) 
+      ))
 
     '(define >
       (lambda (x . y)
