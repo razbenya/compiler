@@ -411,3 +411,10 @@
 ;(append '(1 2) '(3 4))
 ;(append '(1) '(2) '(3))
 ;(append '(1 2 3) '(4 5 6) '(7 8 9) '(10 11 12))
+;(define lst1 (list 1 2 3 4 5))
+;(define lst2 (list 4 3 2 1))
+;(append lst1 lst2)
+
+;(define x 1)
+;(define y 2)
+;`(,x ,y)
