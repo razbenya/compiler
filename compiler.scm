@@ -113,7 +113,7 @@
 
 ; map (variadic), 
 ; make-string, make-vector, vector
-; string-set!, vector-set!
+; vector-set!
 ; string->symbol, symbol->string
 
 (define scheme-functions 
@@ -205,7 +205,7 @@
                      set-car! set-cdr! not b_equal > < b_mul
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
-                     string-set!)) ;todo add lib funcs
+                     string-set! vector-set!)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -306,6 +306,49 @@
 
 (define test_l
   (^make_label "test"))
+
+
+(define add-lib-fun-vector-set
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'vector-set! ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rbx, qword[rbp + 4*8] ;get first param
+                      mov rcx, qword[rbp + 5*8] ;get second param
+                      mov rdx, qword[rbp + 6*8] ;get third param
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_VECTOR
+                      jne "error_l"
+                      mov rax, [rcx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne "error_l"
+                      mov rax, [rbx]
+                      VECTOR_ELEMENTS rax
+                      mov r8, [rcx]
+                      DATA r8
+                      shl r8, 3
+                      lea rax, [rax + r8]
+                      mov [rax], rdx
+                      mov rax, const_1
+                      CLEAN_STACK
+                      ret
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":"
+      ))))
 
 
 (define add-lib-fun-string-set
@@ -2552,6 +2595,7 @@
                             " (add-lib-fun-string-ref ftable)"
                             " (add-lib-fun-symbol? ftable) "
                             " (add-lib-fun-string-set ftable) "
+                            " (add-lib-fun-vector-set ftable) "
                             "
                 ))
            
