@@ -111,9 +111,10 @@
 (define equal-l
   (^make_label "equal"))
 
-; map (variadic), make-string, make-vector,
-; string-set!, string->symbol, symbol?, symbol->string,
-; vector, vector-set!,
+; map (variadic), 
+; make-string, make-vector, vector
+; string-set!, vector-set!
+; string->symbol, symbol->string
 
 (define scheme-functions 
  (map (lambda(e) 
@@ -203,7 +204,8 @@
                      apply b_plus b_minus vector? rational? string? procedure? 
                      set-car! set-cdr! not b_equal > < b_mul
                      b_div string-length vector-length
-                     vector-ref string-ref)) ;todo add lib funcs
+                     vector-ref string-ref symbol?
+                     string-set!)) ;todo add lib funcs
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -304,6 +306,56 @@
 
 (define test_l
   (^make_label "test"))
+
+
+(define add-lib-fun-string-set
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'string-set! ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rbx, qword[rbp + 4*8] ;get first param
+                      mov rcx, qword[rbp + 5*8] ;get second param
+                      mov rdx, qword[rbp + 6*8] ;get third param
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_STRING
+                      jne "error_l"
+                      mov rax, [rcx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne "error_l"
+                      mov rax, [rdx]
+                      TYPE rax
+                      cmp rax, T_CHAR
+                      jne "error_l"
+                      mov rax, [rbx]
+                      STRING_ELEMENTS rax
+                      mov r8, [rcx]
+                      DATA r8
+                      add rax, r8
+                      xor rcx, rcx
+                      mov rcx, [rdx]
+                      DATA rcx
+                      mov byte [rax], cl
+                      mov rax, const_1
+                      CLEAN_STACK
+                      ret
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":"
+      ))))
+
 
 (define add-lib-fun-string-ref
   (lambda (ftable)
@@ -1526,6 +1578,39 @@
                       ")
       )))
 
+(define add-lib-fun-symbol? 
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'symbol? ftable))
+         (B (lambda_body_start))
+         (L (lambda_body_end))
+         (cmp_f_label (cmp_false))
+         (finish_l (finish_label)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 4*8]
+                      mov rax,[rax]
+                      TYPE rax
+                      cmp rax, T_SYMBOL
+                      jne " cmp_f_label "
+                      mov rax, const_4
+                      jmp " finish_l "
+                      " cmp_f_label ":
+                      mov rax,const_3
+                      " finish_l ":
+                      CLEAN_STACK
+                      ret
+                      " L ":
+                      ")
+      )))
+
+
 (define add-lib-fun-integer? 
   (lambda (ftable)
     (let ((addr (lookup-fvar 'integer? ftable))
@@ -2465,6 +2550,8 @@
                             " (add-lib-fun-vector-length ftable)"
                             " (add-lib-fun-vector-ref ftable)"
                             " (add-lib-fun-string-ref ftable)"
+                            " (add-lib-fun-symbol? ftable) "
+                            " (add-lib-fun-string-set ftable) "
                             "
                 ))
            
