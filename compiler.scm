@@ -250,9 +250,8 @@
                       cmp rax, T_NIL
                       JNE "error_l"
                       " type_ok ":
-                      ;reversing the list
                       mov rdi, 0
-                      ;push T_NIL
+                      push T_NIL
                       " loop_enter1 ":
                       mov rax, rbx
                       TYPE rax
@@ -2412,17 +2411,25 @@
                     " B ":
                     push rbp
                     mov rbp, rsp
-                    mov rdi, [rbp+3*8] ;n
-                    mov r8, " (number->string fix-params) "
+                    mov r8, [rbp+3*8] ;n
+                    sub r8, " (number->string fix-params) "
+                    mov rdi, 8* " (number->string fix-params) "
+                    add rdi, 3*8
+                    mov rsi, r8
                     mov rax, const_2
                     " loop_enter ":
-                    cmp rdi, r8
+                    cmp rsi, 0
                     je " loop_exit "
-                    mov rbx, qword[rbp + 8*(rdi + 3)]
-                    MAKE_PAIR rbx, rax
-                    test_malloc 8
-                    mov [rax], rbx              
-                    dec rdi
+                    push rax
+                    mov rax, rsi
+                    shl rax,3
+                    mov r10, rdi
+                    add r10,rax
+                    mov rax, qword[rbp + r10]
+                    push rax
+                    mov rax, [" cons-label "]
+                    CALL_LIB_FUN rax, 1                    
+                    dec rsi
                     jmp " loop_enter "
                     " loop_exit ":
                     mov [rbp + "(number->string (* 8 (+ 4 fix-params)))"], rax
