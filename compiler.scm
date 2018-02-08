@@ -111,9 +111,13 @@
 (define equal-l
   (^make_label "equal"))
 
-; map (variadic), 
-; make-string, make-vector, vector
-; vector-set!
+(define regular_case_label
+  (^make_label "regular_case"))
+
+(define build_string_label
+  (^make_label "build_string"))
+
+; map (variadic), make-vector, vector
 ; string->symbol, symbol->string
 
 (define scheme-functions 
@@ -205,7 +209,85 @@
                      set-car! set-cdr! not b_equal > < b_mul
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
-                     string-set! vector-set!)) ;todo add lib funcs
+                     string-set! vector-set! make-string)) ;todo add lib funcs
+
+(define add-lib-fun-make-string
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'make-string ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (loop_enter (loop_label_enter))
+      (loop_exit (loop_label_exit))
+      (regular_case (regular_case_label))
+      (build_string (build_string_label))
+      (L (lambda_body_end)))
+
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov r8, qword[rbp + 3*8] ;n
+                      cmp r8, 2
+                      jg "error_l" ;error
+                      cmp r8, 1
+                      jl "error_l" ;error
+                      mov rbx, qword[rbp + 4*8] ;get first param
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne "error_l"
+                      cmp r8, 2
+                      je "regular_case"
+                      ;case of 1 param
+                      mov rdx, 0
+                      jmp "build_string"
+
+                      "regular_case":
+                      ;REGULAR CASE with value to init
+                      mov rcx, qword[rbp + 5*8] ;get second param
+                      mov rax, [rcx]
+                      TYPE rax
+                      cmp rax, T_CHAR
+                      jne "error_l"
+                      mov rdx, [rcx]
+                      DATA rdx ;the char to init
+                      jmp "build_string"
+
+                      ;Now we build the string - char in rdx
+                      "build_string":
+                      mov r9, [rbx]
+                      DATA r9; iteration in loop
+                      test_malloc rax
+                      mov r8, rax ; save pointer to begining of malloc in rax
+                      mov rsi, 0
+
+                      "loop_enter":
+                      cmp rsi, r9
+                      je "loop_exit" 
+                      mov [r8+rsi], dl
+                      ;add r8, 1
+                      add rsi, 1
+                      jmp "loop_enter"
+
+                      "loop_exit":
+                      add r8, r9
+                      MAKE_STRING rax, r8
+                      test_malloc 8
+                      mov [rax], r8
+                      CLEAN_STACK
+                      ret
+
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":
+                      "
+      ))))
 
 (define add-lib-fun-apply
   (lambda (ftable)
@@ -2603,6 +2685,7 @@
                             " (add-lib-fun-symbol? ftable) "
                             " (add-lib-fun-string-set ftable) "
                             " (add-lib-fun-vector-set ftable) "
+                            " (add-lib-fun-make-string ftable) "
                             "
                 ))
            

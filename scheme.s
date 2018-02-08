@@ -373,6 +373,15 @@
 	%%LstrEnd:
 %endmacro
 
+%macro MAKE_STRING 2
+	sub %2, %1
+	shl %2, ((WORD_SIZE - TYPE_BITS) >> 1)
+	sub %1, start_of_data
+	or %2, %1
+	shl %2, TYPE_BITS
+	or %2, T_STRING
+%endmacro
+
 %macro STRING_LENGTH 1
 	DATA_UPPER %1
 %endmacro

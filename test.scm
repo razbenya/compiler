@@ -454,3 +454,11 @@
 ; (vector-ref y 1)
 ; (vector-ref y 2)
 ; (vector-ref y 3)
+
+(make-string 2 #\a)
+(make-string 32 #\z)
+(make-string 153 #\!)
+
+(make-string 4)
+(make-string 0)
+(make-string 0 #\b)
