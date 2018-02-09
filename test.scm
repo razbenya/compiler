@@ -462,3 +462,7 @@
 (make-string 4)
 (make-string 0)
 (make-string 0 #\b)
+
+
+#()
+(map + '(1 2 3) '(4 5 6) '(7 8 9))

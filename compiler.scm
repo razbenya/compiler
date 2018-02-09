@@ -198,6 +198,25 @@
        (lambda (x . y)
          (if (null? y) #t
              (and (b_equal x (car y)) (apply = y)))))
+    
+    
+     '(define map
+      (lambda (f . s)
+        (maplist f s)))
+    
+    '(define b_map
+      (lambda (f s)
+        (if (null? s)
+            s
+            (cons (f (car s))
+                  (b_map f (cdr s))))))
+    
+    '(define maplist
+      (lambda (f s)
+        (if (null? (car s))
+            '()
+            (cons (apply f (b_map car s))
+                  (maplist f (b_map cdr s))))))
 
   ))
 )
@@ -2159,8 +2178,10 @@
         ((equal? type "T_STRING") 
          (format "\t\t~A:\n\t\t\tMAKE_LITERAL_STRING ~S\n" addr (cadr value)))
         ((equal? type "T_VECTOR")
-         (format "\t\t~A:\n\t\t\tMAKE_LITERAL_VECTOR ~A\n" 
-                 addr (string-join (map (lambda (e) (format "~A" e)) (cdr value)) ", ")))
+         (if (null? (vector->list (car table-line))) 
+              (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL(~A,0)\n" addr type)
+          (format "\t\t~A:\n\t\t\tMAKE_LITERAL_VECTOR ~A\n" 
+                 addr (string-join (map (lambda (e) (format "~A" e)) (cdr value)) ", "))))
         ((equal? type "T_FRACTION") 
          (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL_FRACTION(~A,~A)\n" addr (cadr value) (caddr value))) 
       (else "WTF"))
