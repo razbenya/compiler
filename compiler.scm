@@ -183,8 +183,8 @@
 
     '(define + 
         (lambda x 
-          (cond ((null? x) 0)
-            (else (b_plus (car x) (apply + (cdr x)))))))       
+          (if (null? x) 0
+            (b_plus (car x) (apply + (cdr x))))))      
     
     '(define - 
         (lambda (x . y)
@@ -308,7 +308,7 @@
                       "
       ))))
 
-(define add-lib-fun-apply
+#;(define add-lib-fun-apply
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'apply ftable))
           (addr-list (lookup-fvar 'list ftable))
@@ -449,6 +449,110 @@
                       jmp ERROR
                       " L ":"
       ))))
+
+(define add-lib-fun-apply
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'apply ftable))
+          (loop_enter1 (loop_label_enter))
+          (loop_exit1 (loop_label_exit))
+          (loop_enter2 (loop_label_enter))
+          (loop_exit2 (loop_label_exit))
+          (loop_enter3 (loop_label_enter))
+          (loop_exit3 (loop_label_exit))
+          (finish_l (finish_label))
+          (error_l (error-label))
+          (check_nil ((^make_label "check_nil")))
+          (type_ok (type_ok_label))
+          (B (lambda_body_start))
+          (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rax, qword[rbp + 3*8] ;n
+                      cmp rax, 2
+                      jne ERROR_NOT_CLOSURE
+                      mov rdx, qword[rbp + 4*8] ;get first param
+                      mov rbx, qword[rbp + 5*8] ;get 2nd param
+                      mov rdx,[rdx]
+                      mov rbx,[rbx]                          
+                      mov rax, rdx
+                      TYPE rax
+                      cmp rax, T_CLOSURE
+                      jne ERROR_NOT_CLOSURE
+                      mov rax, rbx
+                      TYPE rax
+                      cmp rax, T_PAIR
+                      JNE " check_nil "
+                      jmp " type_ok "
+                      " check_nil ":
+                      cmp rax, T_NIL
+                      JNE ERROR_NOT_PAIR
+                      " type_ok ":
+                      mov rdi, 0
+                      mov rcx, rbx
+                      mov rax, const_2
+                      "loop_enter1 ":
+                      cmp rcx,T_NIL
+                      je " loop_exit1 "
+                      mov r8, rcx
+                      packed_car r8
+                      MAKE_PAIR r8, rax
+                      test_malloc 8
+                      mov [rax], r8
+                      CDR rcx
+                      inc rdi
+                      jmp " loop_enter1 "
+                      " loop_exit1 ":
+                      ;push params
+                      push const_2
+                      mov rax, [rax]
+                      "loop_enter2 ":
+                      cmp rax,T_NIL
+                      je " loop_exit2 "
+                      mov rcx, rax
+                      packed_car rcx
+                      push rcx
+                      CDR rax
+                      jmp " loop_enter2 "             
+                      " loop_exit2 ":
+                      push rdi ; push n
+                      mov r11, rdx
+                      CLOSURE_ENV r11            
+                      push r11                              
+                      mov r8,rbp
+                      mov rbp,[rbp] ; rbp <= old rbp                                                                 
+                      mov rbx, [r8+8] ; old ret
+                      push rbx
+                      mov rsi,0
+                      mov r10, 7*8                                
+                      add r10,r8 ; r8 + 8 * (5+2)  
+                      add rdi, 4                                                                
+                      " loop_enter3 ":
+                      cmp rsi, rdi
+                      je " loop_exit3 "
+                      sub r8, 8
+                      sub r10,8 
+                      .b:          
+                      mov r9, [r8]
+                      mov [r10], r9
+                      inc rsi
+                      jmp " loop_enter3 "
+                      " loop_exit3 ":                                    
+                      add rsp, 7*8
+                      .b:
+                      mov rax, rdx                      
+                      CLOSURE_CODE rax
+                      jmp rax           
+                      " L ":
+                      ")
+      )))
+
 
 
 (define add-lib-fun-string-set
