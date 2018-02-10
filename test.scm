@@ -131,11 +131,11 @@
 ; (b_plus 1/4 3/4)
 
 
-;(+ 1/2 1/2 1/2 1 2 3 4)
+; (+ 1/2 1/2 1/2 1 2 3 4)
 
 
-;(- 3 4)
-;(- 1 2 3)
+; (- 3 4)
+; (- 1 2 3)
 ; (((lambda (x . y) (lambda (l) y)) 4 5) 2)
 ; (((lambda (x . y) (lambda (l) y)) 4) 2)
 ; (- 4 3)
@@ -457,39 +457,39 @@
 ; (vector-ref y 3)
 
 
-;#()
-;(map + '(1 2 3) '(4 5 6) '(7 8 9))
+; #()
+; (map + '(1 2 3) '(4 5 6) '(7 8 9))
 
-;(apply list '(1 2 3 4 5 6 7 8))
-;(+ 1 2 3 4 5 4 5 6 7 8 9)
+; (apply list '(1 2 3 4 5 6 7 8))
+; (+ 1 2 3 4 5 4 5 6 7 8 9)
 
-;(- 10 5 4 1 2 3 4 )
+; (- 10 5 4 1 2 3 4 )
 
 
 
-;(make-string 32 #\z)
-;(make-string 4)
-;(make-string 100 #\!)
+; (make-string 32 #\z)
+; (make-string 4)
+; (make-string 100 #\!)
 
-;(make-string 100)
-;(make-string 100 #\b)
+; (make-string 100)
+; (make-string 100 #\b)
 
-;(make-string 1 #\!)
+; (make-string 1 #\!)
 
-;#()
-;(map + '(1 2 3) '(4 5 6) '(7 8 9))
+; #()
+; (map + '(1 2 3) '(4 5 6) '(7 8 9))
 
-;(apply list '(1 2 3 4 5 6 7 8))
-;(+ 1 2 3 4 5 4 5 6 7 8 9)
+; (apply list '(1 2 3 4 5 6 7 8))
+; (+ 1 2 3 4 5 4 5 6 7 8 9)
 
-;(apply - '(10 5 4 1 2 3 4 ))
-;(make-string 1)
-;(make-string 1)
-;(make-string 1 #\b)
+; (apply - '(10 5 4 1 2 3 4 ))
+; (make-string 1)
+; (make-string 1)
+; (make-string 1 #\b)
 
-;(make-string 2 #\a)
+; (make-string 2 #\a)
 
-;(apply + '())
+; (apply + '())
 
 
 ; 'test
@@ -503,10 +503,11 @@
 ; (symbol->string sym)
 
 
-;(make-vector 1)
-(make-vector 2 1)
-(make-vector 4 "a")
-(make-vector 0)
-(make-vector 5 '(1 "eee"))
-(make-vector 34)
+;  (make-vector 1)
+;  (make-vector 2)
+; (make-vector 2 1)
+; (make-vector 4 "a")
+; (make-vector 0)
+; (make-vector 5 '(1 "eee"))
+; (make-vector 34)
 

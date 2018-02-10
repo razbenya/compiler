@@ -277,8 +277,7 @@
                       jne "error_l"
                       mov rdx, [rcx]
                       DATA rdx ;the char to init
-                      jmp "build_string"
-
+                      
                       ;Now we build the string - char in rdx
                       "build_string":
                       mov r9, [rbx]
@@ -773,16 +772,12 @@
                       ;case of 1 param
                       mov rdx, 0
                       MAKE_INT rdx
-                      test_malloc 8
-                      mov [rax], rdx
-                      mov rdx, rax
                       jmp "build_vector"
 
                       "regular_case":
                       ;REGULAR CASE with value to init
                       mov rcx, qword[rbp + 5*8] ;get second param
                       mov rdx, [rcx]
-                      jmp "build_vector"
 
                       ;Now we build the string - value in rdx
                       "build_vector":
