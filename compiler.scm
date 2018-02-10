@@ -661,13 +661,6 @@
                       TYPE rax
                       cmp rax, T_STRING
                       JNE ERROR
-                      mov rax, qword[bucket_head]
-                      ; todo - create macro for tun time make_bucket_label
-                      ;        create macro for tun time make_symbol
-                      ; 	   loop till you find a bucket containg the string or nil 
-                      ;		   if its nill create new bucket with the string and new symbol to point this bucket.
-                      ;		   if its not nill create a symbol that point to the bucket you found. 
-                      
                       mov rdx, qword[bucket_head]
                       "loop_enter":
                       cmp rdx, bucket_0
@@ -681,7 +674,12 @@
                       packed_cdr rdx
                       jmp " loop_enter "
                       .create_new_bucket:
-                      jmp .finish
+                      mov rdx, qword[bucket_head]
+             		  MAKE_BUCKET rbx, rdx
+                      test_malloc 8
+                      mov [rax], rbx
+                      mov [bucket_head],rax
+                      mov r8,rax
                       .found_bucket:
                       MAKE_SYMBOL r8
                       test_malloc 8

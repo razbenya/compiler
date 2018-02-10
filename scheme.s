@@ -440,6 +440,7 @@
 %endmacro
 
 %macro STR_CMPR 2
+	push %2
 	mov r10, %1
 	mov r12, %2
 	STRING_LENGTH r10
@@ -467,6 +468,7 @@
 	%%equal:
 		cmp rax, rax
 	%%finish:
+	pop %2
 %endmacro
 
 %macro MAKE_LITERAL_VECTOR 1+
