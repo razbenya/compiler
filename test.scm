@@ -492,16 +492,21 @@
 ;(apply + '())
 
 
-'test
+; 'test
 
-(string->symbol "test")
+; (string->symbol "test")
 
-'(this is a symbol list)
+; '(this is a symbol list)
 
-(symbol->string 'raz)
-(define sym 'HELLO)
-(symbol->string sym)
+; (symbol->string 'raz)
+; (define sym 'HELLO)
+; (symbol->string sym)
 
 
-
+;(make-vector 1)
+(make-vector 2 1)
+(make-vector 4 "a")
+(make-vector 0)
+(make-vector 5 '(1 "eee"))
+(make-vector 34)
 

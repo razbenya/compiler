@@ -399,6 +399,17 @@
 	%%LstrEnd:
 %endmacro
 
+
+%macro MAKE_VECTOR 2
+	sub %2, %1
+    shr %2, 3
+	shl %2, ((WORD_SIZE - TYPE_BITS) >> 1)
+	sub %1, start_of_data
+	or %2, %1
+	shl %2, TYPE_BITS
+	or %2, T_VECTOR
+%endmacro
+
 %macro MAKE_STRING 2
 	sub %2, %1
 	shl %2, ((WORD_SIZE - TYPE_BITS) >> 1)

@@ -117,8 +117,9 @@
 (define build_string_label
   (^make_label "build_string"))
 
-;make-vector, vector
-; string->symbol, symbol->string
+(define build_vector_label
+  (^make_label "build_vector"))
+
 
 (define scheme-functions 
  (map (lambda(e) 
@@ -228,7 +229,8 @@
                      set-car! set-cdr! not b_equal > < b_mul
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
-                     string-set! vector-set! make-string symbol->string string->symbol )) ;todo add lib funcs
+                     string-set! vector-set! make-string make-vector
+                     symbol->string string->symbol )) ;todo add lib funcs
 
 (define add-lib-fun-make-string
   (lambda (ftable)
@@ -735,6 +737,87 @@
                       jmp ERROR
                       " L ":"
       ))))
+
+(define add-lib-fun-make-vector
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'make-vector ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (loop_enter (loop_label_enter))
+      (loop_exit (loop_label_exit))
+      (regular_case (regular_case_label))
+      (build_vector (build_vector_label))
+      (L (lambda_body_end)))
+
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov r8, qword[rbp + 3*8] ;n
+                      cmp r8, 2
+                      jg "error_l" ;error
+                      cmp r8, 1
+                      jl "error_l" ;error
+                      mov rbx, qword[rbp + 4*8] ;get first param
+                      mov rax, [rbx]
+                      TYPE rax
+                      cmp rax, T_INTEGER
+                      jne "error_l"
+                      cmp r8, 2
+                      je "regular_case"
+                      ;case of 1 param
+                      mov rdx, 0
+                      MAKE_INT rdx
+                      test_malloc 8
+                      mov [rax], rdx
+                      mov rdx, rax
+                      jmp "build_vector"
+
+                      "regular_case":
+                      ;REGULAR CASE with value to init
+                      mov rcx, qword[rbp + 5*8] ;get second param
+                      mov rdx, [rcx]
+                      jmp "build_vector"
+
+                      ;Now we build the string - value in rdx
+                      "build_vector":
+                      mov r9, [rbx]
+                      DATA r9; iteration in loop
+                      mov r10,r9 ; save condition for end of loop
+                      shl r9, 3 ; (multiple by 8 for place to pointer for each value)
+                      test_malloc r9
+                      mov r8, rax
+                      mov r11, r8 ; save pointer to beginning of malloc in r11
+                      mov rsi, 0
+                      "loop_enter":
+                      cmp rsi, r10
+                      je "loop_exit"
+                      test_malloc 8
+                      mov [rax], rdx
+                      mov [r8+rsi*8], rax
+                      add rsi, 1
+                      jmp "loop_enter"
+
+                      "loop_exit":
+                      add r8, r9
+                      MAKE_VECTOR r11, r8
+                      test_malloc 8
+                      mov [rax], r8
+                      CLEAN_STACK
+                      ret
+
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+                      " L ":
+                      "
+      ))))
+
 
 (define add-lib-fun-vector-ref
   (lambda (ftable)
@@ -2929,6 +3012,7 @@
                             " (add-lib-fun-string-set ftable) "
                             " (add-lib-fun-vector-set ftable) "
                             " (add-lib-fun-make-string ftable) "
+                            " (add-lib-fun-make-vector ftable) "
                             " (add-lib-fun-symbol->string ftable) "
                             " (add-lib-fun-string->symbol ftable) "
                             "
