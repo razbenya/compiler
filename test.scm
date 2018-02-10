@@ -1,3 +1,4 @@
+
 ; '(1 2 3 4 5 6)
 ; '(4 5 6 7 8)
 ; "hello world"
@@ -66,8 +67,8 @@
 ; (define a1 '(1 2 3))
 ; (define a2 1)
 ; (eq? a2 (car a1))
-; (define y (cons 1 (cons 2 (cons '()))))
-; (eq? x '(1 2) y)
+; (define y (cons 1 (cons 2 '())))
+; (eq? x '(1 2))
 ; (integer? 2)
 ; (integer? #f)
 ; (integer? '(1 2))
@@ -130,11 +131,11 @@
 ; (b_plus 1/4 3/4)
 
 
-; (+ 1/2 1/2 1/2 1 2 3 4)
+;(+ 1/2 1/2 1/2 1 2 3 4)
 
 
-; (- 3 4)
-; (- 1 2 3)
+;(- 3 4)
+;(- 1 2 3)
 ; (((lambda (x . y) (lambda (l) y)) 4 5) 2)
 ; (((lambda (x . y) (lambda (l) y)) 4) 2)
 ; (- 4 3)
@@ -296,7 +297,7 @@
 ; (- 3/2 2 1 4 2/5)
 ; (- 3/2 2 0 3/2)
 
-; ;;;;;;True
+; ;;;;;True
 ; (> 1 0)
 ; (> 0 -4/3)
 ; (> 2 1 0)
@@ -455,14 +456,52 @@
 ; (vector-ref y 2)
 ; (vector-ref y 3)
 
-(make-string 2 #\a)
-(make-string 32 #\z)
-(make-string 153 #\!)
 
-(make-string 4)
-(make-string 0)
-(make-string 0 #\b)
+;#()
+;(map + '(1 2 3) '(4 5 6) '(7 8 9))
+
+;(apply list '(1 2 3 4 5 6 7 8))
+;(+ 1 2 3 4 5 4 5 6 7 8 9)
+
+;(- 10 5 4 1 2 3 4 )
 
 
-#()
-(map + '(1 2 3) '(4 5 6) '(7 8 9))
+
+;(make-string 32 #\z)
+;(make-string 4)
+;(make-string 100 #\!)
+
+;(make-string 100)
+;(make-string 100 #\b)
+
+;(make-string 1 #\!)
+
+;#()
+;(map + '(1 2 3) '(4 5 6) '(7 8 9))
+
+;(apply list '(1 2 3 4 5 6 7 8))
+;(+ 1 2 3 4 5 4 5 6 7 8 9)
+
+;(apply - '(10 5 4 1 2 3 4 ))
+;(make-string 1)
+;(make-string 1)
+;(make-string 1 #\b)
+
+;(make-string 2 #\a)
+
+;(apply + '())
+
+
+'test
+
+(string->symbol "test")
+
+'(this is a symbol list)
+
+(symbol->string 'raz)
+(define sym 'HELLO)
+(symbol->string sym)
+
+
+
+

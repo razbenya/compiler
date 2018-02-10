@@ -228,7 +228,7 @@
                      set-car! set-cdr! not b_equal > < b_mul
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
-                     string-set! vector-set! make-string symbol->string )) ;todo add lib funcs
+                     string-set! vector-set! make-string symbol->string string->symbol )) ;todo add lib funcs
 
 (define add-lib-fun-make-string
   (lambda (ftable)
@@ -642,6 +642,8 @@
     (let* ((addr (lookup-fvar 'string->symbol ftable))
       (error_l (error-label))
       (B (lambda_body_start))
+      (loop_enter (loop_label_enter))
+      (loop_exit (loop_label_exit))
       (L (lambda_body_end)))
       (string-append "
                       test_malloc 16
@@ -653,23 +655,37 @@
                       push rbp
                       mov rbp, rsp
                       mov rbx, qword[rbp + 4*8] ;get first param
-                      mov rbx,[rbx]
-                      mov rax, rbx
+                      mov r9,[rbx]
+                      mov rax, r9
                       TYPE rax
                       cmp rax, T_STRING
                       JNE ERROR
                       mov rax, qword[bucket_head]
-                      ;"loop_enter":
                       ; todo - create macro for tun time make_bucket_label
                       ;        create macro for tun time make_symbol
                       ; 	   loop till you find a bucket containg the string or nil 
                       ;		   if its nill create new bucket with the string and new symbol to point this bucket.
                       ;		   if its not nill create a symbol that point to the bucket you found. 
-                      mov rbx, rax
-                      CAR rbx
-                      cmp rbx, const_2
-                      ;JE " new-bucket"
                       
+                      mov rdx, qword[bucket_head]
+                      "loop_enter":
+                      cmp rdx, bucket_0
+                      je .create_new_bucket
+                      mov r8, rdx
+                      mov rdx, [rdx]
+                      mov rax, rdx
+                      CAR rax
+                      STR_CMPR rax, r9
+                  	  je .found_bucket ;bucket is in r8
+                      packed_cdr rdx
+                      jmp " loop_enter "
+                      .create_new_bucket:
+                      jmp .finish
+                      .found_bucket:
+                      MAKE_SYMBOL r8
+                      test_malloc 8
+                      mov [rax], r8
+                      .finish:
                       CLEAN_STACK
                       RET
                       " L ":"
@@ -2914,6 +2930,7 @@
                             " (add-lib-fun-vector-set ftable) "
                             " (add-lib-fun-make-string ftable) "
                             " (add-lib-fun-symbol->string ftable) "
+                            " (add-lib-fun-string->symbol ftable) "
                             "
                 ))
            
