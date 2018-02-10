@@ -117,7 +117,7 @@
 (define build_string_label
   (^make_label "build_string"))
 
-; map (variadic), make-vector, vector
+;make-vector, vector
 ; string->symbol, symbol->string
 
 (define scheme-functions 
@@ -228,7 +228,7 @@
                      set-car! set-cdr! not b_equal > < b_mul
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
-                     string-set! vector-set! make-string)) ;todo add lib funcs
+                     string-set! vector-set! make-string symbol->string )) ;todo add lib funcs
 
 (define add-lib-fun-make-string
   (lambda (ftable)
@@ -602,6 +602,79 @@
                       jmp ERROR
                       " L ":"
       ))))
+
+
+
+(define add-lib-fun-symbol->string
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'symbol->string ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rbx, qword[rbp + 4*8] ;get first param
+                      mov rbx,[rbx]
+                      mov rax, rbx
+                      TYPE rax
+                      cmp rax, T_SYMBOL
+                      JNE ERROR
+                      GET_SYMBOL_BUCKET rbx
+                      mov rbx, [rbx]
+                      CAR rbx
+                      test_malloc 8
+                      mov [rax],rbx
+                      CLEAN_STACK
+                      RET
+                      " L ":"
+      ))))
+
+
+(define add-lib-fun-string->symbol
+  (lambda (ftable)
+    (let* ((addr (lookup-fvar 'string->symbol ftable))
+      (error_l (error-label))
+      (B (lambda_body_start))
+      (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rbx, qword[rbp + 4*8] ;get first param
+                      mov rbx,[rbx]
+                      mov rax, rbx
+                      TYPE rax
+                      cmp rax, T_STRING
+                      JNE ERROR
+                      mov rax, qword[bucket_head]
+                      ;"loop_enter":
+                      ; todo - create macro for tun time make_bucket_label
+                      ;        create macro for tun time make_symbol
+                      ; 	   loop till you find a bucket containg the string or nil 
+                      ;		   if its nill create new bucket with the string and new symbol to point this bucket.
+                      ;		   if its not nill create a symbol that point to the bucket you found. 
+                      mov rbx, rax
+                      CAR rbx
+                      cmp rbx, const_2
+                      ;JE " new-bucket"
+                      
+                      CLEAN_STACK
+                      RET
+                      " L ":"
+      ))))
+
 
 
 (define add-lib-fun-string-ref
@@ -2182,6 +2255,8 @@
        		(split-consts (cdr consts-lst) (append acc (split-consts (car consts-lst) '()) (reverse (get-all-cdr (car consts-lst))) `(,(car consts-lst)))))
       ((pair? (car consts-lst))
                 (split-consts (cdr consts-lst) (append acc (split-consts (make_list_from_not_proper_list (car consts-lst)) '()) `(, (car consts-lst)))))
+      ((symbol? (car consts-lst))
+       			(split-consts (cdr consts-lst) (append acc `(,(symbol->string (car consts-lst)) ,(car consts-lst)))))
       (else 
         	(split-consts (cdr consts-lst) (append acc `(,(car consts-lst))))))))
 
@@ -2211,6 +2286,10 @@
 (define make_const_label
   (^make_label "const"))
 
+;const label
+(define make_bucket_label
+  (^make_label "bucket"))
+
 ;find val in the const table and return its label (cadr curr)
 ; Input is sorted so using look-up is assuming val is in table 
 (define lookup-const
@@ -2228,6 +2307,15 @@
 (define fraction? 
   (lambda (n)
     (and (not (integer? n)) (rational? n))))
+
+(define last-bucket "bucket_0")
+
+(define get-bucket
+  (lambda ()
+    (set! last-bucket (make_bucket_label))
+    last-bucket))
+    
+
       
 ;create const type according to val type, called at the end after the const table is built
 ;so calling lookup-const is k and all elements are already there.
@@ -2242,7 +2330,10 @@
        ((string? val) `("T_STRING" ,val))
        ((vector? val ) `("T_VECTOR" ,@(map (lambda (ele) (lookup-const ele table)) (vector->list val))))
        ((fraction? val) `("T_FRACTION" ,(lookup-const (numerator val) table) ,(lookup-const (denominator val) table)))
-       ((pair? val) `("T_PAIR" ,(lookup-const (car val) table) ,(lookup-const (cdr val) table))))
+       ((pair? val) `("T_PAIR" ,(lookup-const (car val) table) ,(lookup-const (cdr val) table)))
+       ((symbol? val)
+        (let ((next-bucket last-bucket))
+        `("T_SYMBOL" ,(lookup-const (symbol->string val) table) ,(get-bucket) ,next-bucket))))
     ))
 
 ;build the const table by iterating the const list, getting the type for the next const and building the table
@@ -2287,7 +2378,18 @@
           (format "\t\t~A:\n\t\t\tMAKE_LITERAL_VECTOR ~A\n" 
                  addr (string-join (map (lambda (e) (format "~A" e)) (cdr value)) ", "))))
         ((equal? type "T_FRACTION") 
-         (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL_FRACTION(~A,~A)\n" addr (cadr value) (caddr value))) 
+         (format "\t\t~A:\n\t\t\tdq MAKE_LITERAL_FRACTION(~A,~A)\n" addr (cadr value) (caddr value)))
+        ((equal? type "T_SYMBOL")
+         (let ((bucket_label (caddr value))
+               (next_bucket (cadddr value))
+               (sym_string (cadr value)))
+           (string-append "
+                          "bucket_label ":
+                          	dq MAKE_SYMBOL_BUCKET("sym_string","next_bucket")
+                          "addr ":
+                          	dq MAKE_LITERAL_SYMBOL(" bucket_label ")
+                          ")))
+          
       (else "WTF"))
     )))
 
@@ -2811,6 +2913,7 @@
                             " (add-lib-fun-string-set ftable) "
                             " (add-lib-fun-vector-set ftable) "
                             " (add-lib-fun-make-string ftable) "
+                            " (add-lib-fun-symbol->string ftable) "
                             "
                 ))
            
@@ -2818,9 +2921,14 @@
            
           	(asm-output 
           	(format "%include \"scheme.s\"\nsection .bss\nglobal main\nsection .data\n\t~A
+            bucket_0:
+                dq MAKE_SYMBOL_BUCKET(const_2, const_2)
+            bucket_head:
+                 dq 0
             ~A
           	section .text
           	\tmain:
+                mov qword[bucket_head],~A
                 mov rax, malloc_pointer
 				mov qword [rax], start_of_data2
                 ~A
@@ -2854,8 +2962,10 @@
                    jmp END
                 END:
                 add rsp, 5*8
-          	    ret\n" asm-ctable asm-ftable asm-lib-func asm-code))
+          	    ret\n" asm-ctable asm-ftable last-bucket asm-lib-func asm-code))
           	)
+      
+      		
   			
      		 (string->file asm-output out)
         		(display asm-output)
