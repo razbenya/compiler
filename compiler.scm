@@ -168,6 +168,7 @@
                            (bigger? y (car rest) (cdr rest)))))))
           (bigger? x (car y) (cdr y))))))
 
+
     '(define *
         (lambda x 
           (cond ((null? x) 1)
@@ -201,6 +202,18 @@
              (and (b_equal x (car y)) (apply = y)))))
     
     
+    '(define list-length
+    	(lambda (x)
+    		(if (null? x) 
+    			0
+    			(+ 1 (list-length (cdr x)))
+    		)))
+
+    '(define vector 
+        (lambda x 
+          (if (null? x) #()
+            (list->vector x (list-length x)))))
+
      '(define map
       (lambda (f . s)
         (maplist f s)))
@@ -222,7 +235,6 @@
   ))
 )
 
-
 (define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
                      cons char->integer integer->char null? pair? zero? number? numerator
                      apply b_plus b_minus vector? rational? string? procedure? 
@@ -230,7 +242,7 @@
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
                      string-set! vector-set! make-string make-vector
-                     symbol->string string->symbol )) ;todo add lib funcs
+                     symbol->string string->symbol list->vector list-length)) ;todo add lib funcs
 
 (define add-lib-fun-make-string
   (lambda (ftable)
@@ -271,18 +283,18 @@
                       "regular_case":
                       ;REGULAR CASE with value to init
                       mov rcx, qword[rbp + 5*8] ;get second param
-                      mov rax, [rcx]
-                      TYPE rax
-                      cmp rax, T_CHAR
+                      mov r8, [rcx]
+                      TYPE r8
+                      cmp r8, T_CHAR
                       jne "error_l"
                       mov rdx, [rcx]
                       DATA rdx ;the char to init
-                      
+
                       ;Now we build the string - char in rdx
                       "build_string":
                       mov r9, [rbx]
-                      DATA r9; iteration in loop
-                      test_malloc rax
+                      DATA r9; iterations in loop
+                      test_malloc r9
                       mov r8, rax ; save pointer to begining of malloc in rax
                       mov rsi, 0
 
@@ -780,7 +792,7 @@
                       ;Now we build the string - value in rdx
                       "build_vector":
                       mov r9, [rbx]
-                      DATA r9; iteration in loop
+                      DATA r9; iterations in loop
                       mov r10,r9 ; save condition for end of loop
                       shl r9, 3 ; (multiple by 8 for place to pointer for each value)
                       test_malloc r9
@@ -1875,6 +1887,77 @@
                       mov [rax],rdx
                       CLEAN_STACK
                       ret
+                      " L ":
+                      ")
+      )))
+
+(define add-lib-fun-list->vector
+  (lambda (ftable)
+    (let ((addr (lookup-fvar 'list->vector ftable))
+         (error_l (error-label))
+         (loop_enter (loop_label_enter))
+         (loop_exit (loop_label_exit))
+         (B (lambda_body_start))
+         (L (lambda_body_end)))
+      (string-append "
+                      test_malloc 16
+                      mov rbx,0 ;setup fake env
+                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
+                      ;mov rax,[rax]
+                      mov qword[" addr "], rax
+                      jmp " L "
+                      " B ":
+                      push rbp
+                      mov rbp, rsp
+                      mov rcx, qword[rbp + 3*8] ; n
+                      mov rdx, qword[rbp + 4*8] ;get first param - list
+                      mov rbx, qword[rbp + 5*8] ;get second param - length
+                      cmp rcx, 2
+                      jne "error_l"
+                      mov rax, [rdx]
+                      TYPE rax
+                      cmp rax, T_PAIR
+                      jne "error_l"
+                      mov r8, [rdx]
+                      mov rsi, 0
+                      mov r11, [rbx]
+                      DATA r11
+                      mov rbx, r11
+                      shl rbx, 3
+                      test_malloc rbx
+                      mov r10, rax ; r10 holds the begining of the malloc
+
+                      "loop_enter":
+                      cmp rsi, r11
+                      je "loop_exit"
+                      mov rdx, r8
+                      CAR r8
+                      check:
+
+                      test_malloc 8
+                                            check2:
+
+                      mov [rax], r8
+                      mov [r10+rsi*8], rax
+                      add rsi, 1
+                      CDR rdx
+                      mov r8, rdx
+                      jmp "loop_enter"
+
+                      "loop_exit":
+                      mov rax, r10
+                      shl rsi, 3
+                      add r10, rsi
+                      MAKE_VECTOR rax, r10
+                      test_malloc 8
+                      mov [rax], r10
+                      CLEAN_STACK
+                      ret
+
+                      "error_l":
+                      CLEAN_STACK
+                      jmp ERROR
+
                       " L ":
                       ")
       )))
@@ -3008,6 +3091,7 @@
                             " (add-lib-fun-make-vector ftable) "
                             " (add-lib-fun-symbol->string ftable) "
                             " (add-lib-fun-string->symbol ftable) "
+                            " (add-lib-fun-list->vector ftable) "
                             "
                 ))
            
