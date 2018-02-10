@@ -15,6 +15,7 @@
 %define T_CLOSURE 9
 %define T_PAIR 10
 %define T_VECTOR 11
+%define T_BUCKET 12
 
 %define CHAR_NUL 0
 %define CHAR_TAB 9
@@ -36,6 +37,11 @@
 	sar %1, TYPE_BITS
 %endmacro
 
+%macro GET_SYMBOL_BUCKET 1
+	sar %1, TYPE_BITS
+	add %1, start_of_data
+%endmacro
+
 %macro DATA_UPPER 1
 	sar %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS)
 %endmacro
@@ -46,6 +52,15 @@
 %endmacro
 
 %define MAKE_LITERAL_PAIR(car, cdr) (((((car - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (cdr - start_of_data)) << TYPE_BITS) | T_PAIR)
+
+%define MAKE_LITERAL_SYMBOL(bucket) (((bucket - start_of_data) << TYPE_BITS) | T_SYMBOL)
+
+%macro MAKE_SYMBOL 1
+	sub %1, start_of_data
+	shl %1, TYPE_BITS
+	OR %1, T_SYMBOL
+%endmacro
+
 
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
 
@@ -315,6 +330,17 @@
 	or %1, T_PAIR
 %endmacro
 
+%define MAKE_SYMBOL_BUCKET(str, last) (((((str - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (last - start_of_data)) << TYPE_BITS) | T_BUCKET)
+
+%macro MAKE_BUCKET 2
+	sub %1, start_of_data
+	shl %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS)
+	sub %2, start_of_data
+	shl %2, TYPE_BITS
+	or %1, %2
+	or %1, T_BUCKET
+%endmacro
+
 %macro packed_car 1
 	DATA_UPPER %1
 	add %1, start_of_data
@@ -400,6 +426,36 @@
 	add rax, %3
 	mov %1, byte [rax]
 	pop rax
+%endmacro
+
+%macro STR_CMPR 2
+	mov r10, %1
+	mov r12, %2
+	STRING_LENGTH r10
+	STRING_LENGTH r12
+	cmp r10, r12
+	jne %%not_equal
+	STRING_ELEMENTS %1
+	STRING_ELEMENTS %2
+	mov rdi, r10
+	%%loop:
+		cmp rdi,0
+		je %%equal
+		mov cl, byte [%1]
+		cmp cl, byte [%2]
+		jne %%not_equal
+		inc %1
+		inc %2
+		dec rdi
+		jmp %%loop
+	%%not_equal:
+		mov r10, 1
+	    mov r12, 2
+		cmp r10, r12
+		jmp %%finish
+	%%equal:
+		cmp rax, rax
+	%%finish:
 %endmacro
 
 %macro MAKE_LITERAL_VECTOR 1+
@@ -929,9 +985,88 @@ section	.data
 write_sob_symbol:
 	push rbp
 	mov rbp, rsp
+	mov rax, qword[rbp +8 + 1*8]
+	GET_SYMBOL_BUCKET rax
+	mov rax, [rax]
+	CAR rax
+	mov rcx, rax
+	STRING_LENGTH rcx
+	STRING_ELEMENTS rax
+
+	.loop:
+		cmp rcx, 0
+		je .done
+		mov bl, byte [rax]
+		and rbx, 0xff
+
+		cmp rbx, CHAR_TAB
+		je .ch_tab
+		cmp rbx, CHAR_NEWLINE
+		je .ch_newline
+		cmp rbx, CHAR_PAGE
+		je .ch_page
+		cmp rbx, CHAR_RETURN
+		je .ch_return
+		cmp rbx, CHAR_SPACE
+		jl .ch_hex
+		
+		mov rdi, .fs_simple_char
+		mov rsi, rbx
+		jmp .printf
+		
+	.ch_hex:
+		mov rdi, .fs_hex_char
+		mov rsi, rbx
+		jmp .printf
+		
+	.ch_tab:
+		mov rdi, .fs_tab
+		mov rsi, rbx
+		jmp .printf
+		
+	.ch_page:
+		mov rdi, .fs_page
+		mov rsi, rbx
+		jmp .printf
+		
+	.ch_return:
+		mov rdi, .fs_return
+		mov rsi, rbx
+		jmp .printf
+
+	.ch_newline:
+		mov rdi, .fs_newline
+		mov rsi, rbx
+
+	.printf:
+		push rax
+		push rcx
+		mov rax, 0
+		call printf
+		pop rcx
+		pop rax
+
+		dec rcx
+		inc rax
+		jmp .loop
+
+	.done:
 
 	leave
 	ret
+section .data
+.fs_simple_char:
+	db "%c", 0
+.fs_hex_char:
+	db "\x%02x;", 0	
+.fs_tab:
+	db "\t", 0
+.fs_page:
+	db "\f", 0
+.fs_return:
+	db "\r", 0
+.fs_newline:
+	db "\n", 0
 
 	
 write_sob_fraction:
