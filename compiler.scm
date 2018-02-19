@@ -127,7 +127,14 @@
           (pe->lex-pe
           (box-set
           (remove-applic-lambda-nil (parse e))))))
-  (list 
+  (list
+    
+    '(define eq?
+       (let ((old-eq? eq?))
+         (lambda (x y)
+           (if (and (number? x) (number? y))
+               (= x y)
+               (old-eq? x y))))) 
      
     '(define list (lambda x x))
     
@@ -139,10 +146,13 @@
                               lst2
                               (cons (car lst1) (b_append (cdr lst1) lst2))))))
               (if (null? x) x
-                  (b_append (car x) (apply append (cdr x))))) 
-      ))
+                  (if (null? (cdr x)) (car x)
+                    (b_append (car x) (apply append (cdr x))))) 
+      )))
 
     '(define >
+       (let ((bigger? bigger?)
+            (positive? positive?))
       (lambda (x . y)
         (if (null? y)
           #t
@@ -152,9 +162,11 @@
                           (positive? (- x y))
                           (and (positive? (- x y))
                             (bigger? y (car rest) (cdr rest)))))))
-          (bigger? x (car y) (cdr y))))))
+          (bigger? x (car y) (cdr y)))))))
 
     '(define <
+      (let ((bigger? bigger?)
+            (positive? positive?))
       (lambda (x . y)
         (if (null? y)
           #t
@@ -166,40 +178,45 @@
                       (and (not (positive? (- x y))) 
                             (not (zero? (- x y)))
                            (bigger? y (car rest) (cdr rest)))))))
-          (bigger? x (car y) (cdr y))))))
+          (bigger? x (car y) (cdr y)))))))
 
 
     '(define *
         (lambda x 
+          (let ((b_mul b_mul))
           (cond ((null? x) 1)
-            (else (b_mul (car x) (apply * (cdr x)))))))
+            (else (b_mul (car x) (apply * (cdr x))))))))
 
     '(define / 
+      (let ((b_div b_div))
         (lambda (x . y)
           (letrec ((iter 
                      (lambda (acc x . z)
                         (if (null? z) (b_div acc x)
                             (apply iter (cons (b_div acc x) z))))))
           (if (null? y) (b_div 1 x)
-                       (apply iter (cons x y))))))
+                       (apply iter (cons x y)))))))
 
     '(define + 
-        (lambda x 
+       (let ((b_plus b_plus))
+        (lambda x
           (if (null? x) 0
-            (b_plus (car x) (apply + (cdr x))))))      
+            (b_plus (car x) (apply + (cdr x)))))))    
     
     '(define - 
+       (let ((b_minus b_minus))
         (lambda (x . y)
           (letrec ((iter 
                      (lambda (acc x . z)
                         (if (null? z) (b_minus acc x)
                             (apply iter (cons (b_minus acc x) z))))))
           (if (null? y) (b_minus 0 x)
-                       (apply iter (cons x y))))))
+                       (apply iter (cons x y)))))))
     '(define =
+       (let ((b_equal b_equal))
        (lambda (x . y)
          (if (null? y) #t
-             (and (b_equal x (car y)) (apply = y)))))
+             (and (b_equal x (car y)) (apply = y))))))
     
     
     '(define list-length
@@ -209,14 +226,12 @@
     			(+ 1 (list-length (cdr x)))
     		)))
 
-    '(define vector 
+    '(define vector
+       (let ((list-length list-length)) 
         (lambda x 
           (if (null? x) #()
-            (list->vector x (list-length x)))))
+            (list->vector x (list-length x))))))
 
-     '(define map
-      (lambda (f . s)
-        (maplist f s)))
     
     '(define b_map
       (lambda (f s)
@@ -226,14 +241,34 @@
                   (b_map f (cdr s))))))
     
     '(define maplist
+       (let ((b_map b_map))
       (lambda (f s)
         (if (null? (car s))
             '()
             (cons (apply f (b_map car s))
-                  (maplist f (b_map cdr s))))))
+                  (maplist f (b_map cdr s)))))))
+    
+    '(define map
+      (let ((maplist maplist))
+        (lambda (f . s)
+          (maplist f s))))
 
   ))
 )
+
+
+(define both_fraction_l
+  (^make_label "both_fraction"))
+
+(define int_with_fract_l
+  (^make_label "int_with_fract"))
+
+(define negative_l
+  (^make_label "negative"))
+
+(define test_l
+  (^make_label "test"))
+
 
 (define lib-funcs '(boolean? car cdr char? eq? integer? denominator remainder
                      cons char->integer integer->char null? pair? zero? number? numerator
@@ -242,12 +277,11 @@
                      b_div string-length vector-length
                      vector-ref string-ref symbol?
                      string-set! vector-set! make-string make-vector
-                     symbol->string string->symbol list->vector list-length)) ;todo add lib funcs
+                     symbol->string string->symbol list->vector list-length))
 
 (define add-lib-fun-make-string
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'make-string ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (loop_enter (loop_label_enter))
       (loop_exit (loop_label_exit))
@@ -266,14 +300,14 @@
                       mov rbp, rsp
                       mov r8, qword[rbp + 3*8] ;n
                       cmp r8, 2
-                      jg "error_l" ;error
+                      jg ERROR
                       cmp r8, 1
-                      jl "error_l" ;error
+                      jl ERROR ;error
                       mov rbx, qword[rbp + 4*8] ;get first param
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       cmp r8, 2
                       je "regular_case"
                       ;case of 1 param
@@ -286,7 +320,7 @@
                       mov r8, [rcx]
                       TYPE r8
                       cmp r8, T_CHAR
-                      jne "error_l"
+                      jne ERROR
                       mov rdx, [rcx]
                       DATA rdx ;the char to init
 
@@ -313,118 +347,14 @@
                       mov [rax], r8
                       CLEAN_STACK
                       ret
-
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":
                       "
       ))))
-
-#;(define add-lib-fun-apply
-  (lambda (ftable)
-    (let* ((addr (lookup-fvar 'apply ftable))
-          (addr-list (lookup-fvar 'list ftable))
-          (loop_enter1 (loop_label_enter))
-          (loop_exit1 (loop_label_exit))
-          (loop_enter2 (loop_label_enter))
-          (loop_exit2 (loop_label_exit))
-          (finish_l (finish_label))
-          (error_l (error-label))
-          (check_nil ((^make_label "check_nil")))
-          (type_ok (type_ok_label))
-          (B (lambda_body_start))
-          (L (lambda_body_end)))
-      (string-append "
-                      test_malloc 16
-                      mov rbx,0 ;setup fake env
-                      MAKE_LITERAL_CLOSURE rax, rbx ," B "
-                      mov qword[" addr "], rax
-                      jmp " L "
-                      " B ":
-                      push rbp
-                      mov rbp, rsp
-                      mov rax, qword[rbp + 3*8] ;n
-                      cmp rax, 2
-                      jne "error_l"
-                      mov rdx, qword[rbp + 4*8] ;get first param
-                      mov rbx, qword[rbp + 5*8] ;get 2nd param
-                      mov rdx,[rdx]
-                      mov rbx,[rbx]                          
-                      mov rax, rdx
-                      TYPE rax
-                      cmp rax, T_CLOSURE
-                      jne "error_l"
-                      mov rax, rbx
-                      TYPE rax
-                      cmp rax, T_PAIR
-                      JNE " check_nil "
-                      jmp " type_ok "
-                      " check_nil ":
-                      cmp rax, T_NIL
-                      JNE "error_l"
-                      " type_ok ":
-                      mov rdi, 0
-                      push T_NIL
-                      " loop_enter1 ":
-                      mov rax, rbx
-                      TYPE rax
-                      cmp rax, T_PAIR
-                      jne " loop_exit1 "
-                      inc rdi
-                      mov rax, rbx
-                      packed_car rax
-                      push rax
-                      CDR rbx
-                      jmp " loop_enter1 "
-                      " loop_exit1 ":
-                      mov rax, ["addr-list"]
-                      CALL_LIB_FUN rax, rdi
-                      mov rbx, [rax]
-                      mov rdi, 0
-                      push T_NIL
-                      " loop_enter2 ":
-                      mov rax, rbx
-                      TYPE rax
-                      cmp rax, T_PAIR
-                      jne " loop_exit2 "
-                      inc rdi
-                      mov rax, rbx
-                      packed_car rax
-                      push rax
-                      CDR rbx
-                      jmp " loop_enter2 "
-                      " loop_exit2 ":
-                      mov rdx, qword[rbp + 4*8] ;get first param
-                      CALL_LIB_FUN rdx, rdi
-                      jmp "finish_l "
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
-                      " finish_l ":
-                      CLEAN_STACK
-                      ret
-                      " L ":
-                      ")
-      )))
-
-(define both_fraction_l
-  (^make_label "both_fraction"))
-
-(define int_with_fract_l
-  (^make_label "int_with_fract"))
-
-(define negative_l
-  (^make_label "negative"))
-
-(define test_l
-  (^make_label "test"))
 
 
 (define add-lib-fun-vector-set
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'vector-set! ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -436,17 +366,22 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp+3*8] ;n
+                      cmp r8, 3
+                      jne ERROR    
+                          
                       mov rbx, qword[rbp + 4*8] ;get first param
                       mov rcx, qword[rbp + 5*8] ;get second param
                       mov rdx, qword[rbp + 6*8] ;get third param
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_VECTOR
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rcx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rbx]
                       VECTOR_ELEMENTS rax
                       mov r8, [rcx]
@@ -457,9 +392,6 @@
                       mov rax, const_1
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
@@ -473,7 +405,6 @@
           (loop_enter3 (loop_label_enter))
           (loop_exit3 (loop_label_exit))
           (finish_l (finish_label))
-          (error_l (error-label))
           (check_nil ((^make_label "check_nil")))
           (type_ok (type_ok_label))
           (B (lambda_body_start))
@@ -489,7 +420,7 @@
                       mov rbp, rsp
                       mov rax, qword[rbp + 3*8] ;n
                       cmp rax, 2
-                      jne ERROR_NOT_CLOSURE
+                      jne ERROR
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
                       mov rdx,[rdx]
@@ -497,7 +428,7 @@
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_CLOSURE
-                      jne ERROR_NOT_CLOSURE
+                      jne ERROR
                       mov rax, rbx
                       TYPE rax
                       cmp rax, T_PAIR
@@ -505,7 +436,7 @@
                       jmp " type_ok "
                       " check_nil ":
                       cmp rax, T_NIL
-                      JNE ERROR_NOT_PAIR
+                      JNE ERROR
                       " type_ok ":
                       mov rdi, 0
                       mov rcx, rbx
@@ -571,7 +502,6 @@
 (define add-lib-fun-string-set
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'string-set! ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -583,21 +513,26 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp+ 3*8]
+                      cmp r8, 3
+                      jne ERROR    
+                          
                       mov rbx, qword[rbp + 4*8] ;get first param
                       mov rcx, qword[rbp + 5*8] ;get second param
                       mov rdx, qword[rbp + 6*8] ;get third param
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_STRING
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rcx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_CHAR
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rbx]
                       STRING_ELEMENTS rax
                       mov r8, [rcx]
@@ -610,9 +545,6 @@
                       mov rax, const_1
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
@@ -621,7 +553,6 @@
 (define add-lib-fun-symbol->string
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'symbol->string ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -633,17 +564,19 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rbx, qword[rbp + 4*8] ;get first param
                       mov rbx,[rbx]
                       mov rax, rbx
                       TYPE rax
                       cmp rax, T_SYMBOL
                       JNE ERROR
-                      GET_SYMBOL_BUCKET rbx
-                      mov rbx, [rbx]
-                      CAR rbx
-                      test_malloc 8
-                      mov [rax],rbx
+                      packed_car rbx
+                      mov rax, rbx
                       CLEAN_STACK
                       RET
                       " L ":"
@@ -653,7 +586,6 @@
 (define add-lib-fun-string->symbol
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'string->symbol ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (loop_enter (loop_label_enter))
       (loop_exit (loop_label_exit))
@@ -667,6 +599,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rbx, qword[rbp + 4*8] ;get first param
                       mov r9,[rbx]
                       mov rax, r9
@@ -687,15 +624,13 @@
                       jmp " loop_enter "
                       .create_new_bucket:
                       mov rdx, qword[bucket_head]
-             		  MAKE_BUCKET rbx, rdx
+             		      MAKE_BUCKET rbx, rdx
                       test_malloc 8
                       mov [rax], rbx
                       mov [bucket_head],rax
                       mov r8,rax
                       .found_bucket:
-                      MAKE_SYMBOL r8
-                      test_malloc 8
-                      mov [rax], r8
+                      mov rax,r8
                       .finish:
                       CLEAN_STACK
                       RET
@@ -707,7 +642,6 @@
 (define add-lib-fun-string-ref
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'string-ref ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -719,16 +653,21 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR    
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get second param
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_STRING
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       mov rbx, [rbx]
                       mov rdx, [rdx]
                       DATA rbx
@@ -741,16 +680,12 @@
                       mov [rax], rcx
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
 (define add-lib-fun-make-vector
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'make-vector ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (loop_enter (loop_label_enter))
       (loop_exit (loop_label_exit))
@@ -769,14 +704,14 @@
                       mov rbp, rsp
                       mov r8, qword[rbp + 3*8] ;n
                       cmp r8, 2
-                      jg "error_l" ;error
+                      jg ERROR ;error
                       cmp r8, 1
-                      jl "error_l" ;error
+                      jl ERROR ;error
                       mov rbx, qword[rbp + 4*8] ;get first param
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       cmp r8, 2
                       je "regular_case"
                       ;case of 1 param
@@ -815,10 +750,6 @@
                       mov [rax], r8
                       CLEAN_STACK
                       ret
-
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":
                       "
       ))))
@@ -827,7 +758,6 @@
 (define add-lib-fun-vector-ref
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'vector-ref ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -839,36 +769,36 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                                  
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get second param
                       mov rax, [rdx] 
                       TYPE rax
                       cmp rax, T_VECTOR
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       mov rbx, [rbx]
                       mov rdx, [rdx]
                       DATA rbx
                       test_malloc 8
                       mov r8, rax
                       VECTOR_REF r8,rdx,rbx
-                      test_malloc 8
-                      mov [rax], r8
+                      mov rax, r8
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
 (define add-lib-fun-vector-length
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'vector-length ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -880,11 +810,16 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                              
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rax, [rdx] 
                       TYPE rax
                       cmp rax, T_VECTOR
-                      jne "error_l"
+                      jne ERROR
                       mov rcx, [rdx]
                       VECTOR_LENGTH rcx
                       MAKE_INT rcx
@@ -892,16 +827,12 @@
                       mov [rax], rcx
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
 (define add-lib-fun-string-length
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'string-length ftable))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -913,11 +844,16 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rax, [rdx] 
                       TYPE rax
                       cmp rax, T_STRING
-                      jne "error_l"
+                      jne ERROR
                       mov rcx, [rdx]
                       STRING_LENGTH rcx
                       MAKE_INT rcx
@@ -925,9 +861,6 @@
                       mov [rax], rcx
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
@@ -939,7 +872,6 @@
       (test_integer (test_l))
       (test_fraction (test_l))
       (finish_l (finish_label))
-      (error_l (error-label))
       (B (lambda_body_start))
       (L (lambda_body_end)))
       (string-append "
@@ -951,6 +883,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rax, [rdx] 
                       TYPE rax
@@ -960,7 +897,7 @@
                       TYPE rax
                       cmp rax, T_FRACTION
                       je "test_fraction"
-                      jmp "error_l"
+                      jmp ERROR
                       "test_integer ":
                       mov rax, [rdx]
                       DATA rax
@@ -982,9 +919,6 @@
                       "finish_l":
                       CLEAN_STACK
                       ret
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":"
       ))))
 
@@ -1004,7 +938,6 @@
           (divide (divide_l))
           (multiple (multiple_l))
           (switch (divide_l))
-          (error_l (error-label))
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
@@ -1016,6 +949,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
                       ;*** check_first ***
@@ -1024,7 +962,7 @@
                       cmp rax, T_FRACTION
                       je " compare_second "
                       cmp rax, T_INTEGER
-                      jne " error_l "
+                      jne ERROR
                       ;*** change one to fraction ***
 
                       mov rax, const_5                 
@@ -1040,12 +978,12 @@
                       cmp rax, T_FRACTION
                       je "switch"
                       cmp rax, T_INTEGER
-                      jne " error_l "
+                      jne ERROR
                       ;this is integer - divide in zero handling
                       mov rax, [rbx]
                       DATA rax
                       cmp rax, 0
-                      je " error_l "
+                      je ERROR
 
                       ;***change second to fraction ***
                       mov rax, const_5                 
@@ -1117,9 +1055,7 @@
                       mov [rax],rdx      
                       CLEAN_STACK
                       ret
-                      " error_l ":
-                      CLEAN_STACK
-                      jmp ERROR
+                      
                       " L ":
                       ")
       ))) 
@@ -1130,7 +1066,6 @@
     (let* ((addr (lookup-fvar 'b_mul ftable))
           (compare_second (compare_second_l))
           (multiple (multiple_l))
-          (error_l (error-label))
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
@@ -1142,6 +1077,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
                       ;*** check_first ***
@@ -1150,7 +1090,7 @@
                       cmp rax, T_FRACTION
                       je " compare_second "
                       cmp rax, T_INTEGER
-                      jne " error_l "
+                      jne ERROR
                       ;*** change one to fraction ***
 
                       mov rax, const_5                 
@@ -1166,7 +1106,7 @@
                       cmp rax, T_FRACTION
                       je "multiple"
                       cmp rax, T_INTEGER
-                      jne " error_l "
+                      jne ERROR
 
                       ;***change second to fraction ***
                       mov rax, const_5                 
@@ -1185,9 +1125,6 @@
                       mov [rax],rdx      
                       CLEAN_STACK
                       ret
-                      " error_l ":
-                      CLEAN_STACK
-                      jmp ERROR
                       " L ":
                       ")
       )))          
@@ -1204,7 +1141,6 @@
           (int_with_fract (int_with_fract_l))
           (both_fraction (both_fraction_l))
           (finish_add (finish_add_l))
-          (error_l (error-label))
           (B (lambda_body_start))
           (L (lambda_body_end)))
       (string-append "
@@ -1216,6 +1152,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
                       ;*** check_first ***
@@ -1244,7 +1185,7 @@
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne "error_l"
+                      jne ERROR
                       
                       ;**first: fraction check second **
 
@@ -1253,7 +1194,7 @@
                       cmp rax, T_FRACTION
                       je " both_fraction "
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       
                       ; first: fraction second: integer
 
@@ -1266,7 +1207,7 @@
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne " error_l "
+                      jne ERROR
 
                       ;first: integer second: fraction
                       ;change between rbx and rdx
@@ -1281,7 +1222,7 @@
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne "error_l"                     
+                      jne ERROR                    
                       " both_fraction ":
                       
                       ADD_FRACTION rdx, rbx               
@@ -1322,15 +1263,14 @@
                                             
                       CLEAN_STACK
                       ret
-                      " error_l ":
-                      CLEAN_STACK
-                      jmp ERROR
+                     
                       " L ":
                       ")
       )))
 
 (define continue-l
   (^make_label "continue_label"))
+
 (define add-lib-fun-b_equal
   (lambda (ftable)
     (let* ((addr (lookup-fvar 'b_equal ftable))
@@ -1353,6 +1293,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd param
                       ;*** check_first ***
@@ -1380,7 +1325,7 @@
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne "error_l"
+                      jne ERROR
                       
                       ;**first: fraction check second **
                       mov rax, [rbx]
@@ -1388,7 +1333,7 @@
                       cmp rax, T_FRACTION
                       je " both_fraction "
                       cmp rax, T_INTEGER
-                      jne "error_l"
+                      jne ERROR
                       
                       ; first: fraction second: integer                   
                       mov rax, const_3
@@ -1409,7 +1354,7 @@
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne "error_l"                     
+                      jne ERROR                    
                       " both_fraction ":
                       mov rdx, [rdx] ;first number
                       mov rbx, [rbx] ;second number
@@ -1434,9 +1379,7 @@
                       " finish_add ":                  
                       CLEAN_STACK
                       ret
-                      " error_l ":
-                      CLEAN_STACK
-                      jmp ERROR
+                      
                       " L ":
                       ")
       )))
@@ -1461,6 +1404,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get 2nd para
                       ;*** check_first ***
@@ -1489,7 +1437,7 @@
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne ERROR_NOT_NUMBER
+                      jne ERROR
                       
                       ;**first: fraction check second **
                       mov rax, [rbx]
@@ -1497,7 +1445,7 @@
                       cmp rax, T_FRACTION
                       je " both_fraction "
                       cmp rax, T_INTEGER
-                      jne ERROR_NOT_NUMBER
+                      jne ERROR
                       
                       ; first: fraction second: integer                   
                       
@@ -1531,7 +1479,7 @@
                       mov rax, [rbx]
                       TYPE rax
                       cmp rax, T_FRACTION
-                      jne ERROR_NOT_NUMBER                     
+                      jne ERROR                    
                       " both_fraction ":
                       
                       NEG_FRACTION rbx
@@ -1568,6 +1516,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rdx, [rdx]
                       cmp rdx, T_INTEGER
@@ -1600,6 +1553,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       cmp rdx, const_3
                       jne " cmp_f_label "
@@ -1630,6 +1588,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       TYPE rax
@@ -1662,6 +1625,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       TYPE rax
@@ -1694,6 +1662,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       TYPE rax
@@ -1726,6 +1699,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       TYPE rax
@@ -1770,6 +1748,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       TYPE rax
@@ -1808,6 +1791,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rdx,[rdx]
                       mov rax, qword[const_2] ;nil
@@ -1838,12 +1826,17 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rdx,[rdx]
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_CHAR
-                      jne ERROR_NOT_CHAR
+                      jne ERROR
                           
                       test_malloc 8
                    
@@ -1874,12 +1867,17 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rdx,[rdx]
                       mov rax, rdx
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne ERROR_NOT_CHAR    
+                      jne ERROR   
                       test_malloc 8
                       DATA rdx
                       shl rdx, TYPE_BITS
@@ -1894,7 +1892,6 @@
 (define add-lib-fun-list->vector
   (lambda (ftable)
     (let ((addr (lookup-fvar 'list->vector ftable))
-         (error_l (error-label))
          (loop_enter (loop_label_enter))
          (loop_exit (loop_label_exit))
          (B (lambda_body_start))
@@ -1913,11 +1910,11 @@
                       mov rdx, qword[rbp + 4*8] ;get first param - list
                       mov rbx, qword[rbp + 5*8] ;get second param - length
                       cmp rcx, 2
-                      jne "error_l"
+                      jne ERROR
                       mov rax, [rdx]
                       TYPE rax
                       cmp rax, T_PAIR
-                      jne "error_l"
+                      jne ERROR
                       mov r8, [rdx]
                       mov rsi, 0
                       mov r11, [rbx]
@@ -1935,7 +1932,7 @@
                       check:
 
                       test_malloc 8
-                                            check2:
+
 
                       mov [rax], r8
                       mov [r10+rsi*8], rax
@@ -1953,10 +1950,6 @@
                       mov [rax], r10
                       CLEAN_STACK
                       ret
-
-                      "error_l":
-                      CLEAN_STACK
-                      jmp ERROR
 
                       " L ":
                       ")
@@ -1977,6 +1970,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get sec param
                       MAKE_PAIR rdx, rbx
@@ -2005,6 +2003,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       TYPE rax
@@ -2026,7 +2029,6 @@
     (let ((addr (lookup-fvar 'remainder ftable))
          (B (lambda_body_start))
          (L (lambda_body_end))
-         (error_l (error-label))
          (positive (positive-label))
          (finish_l (finish_label)))
       (string-append "
@@ -2038,35 +2040,41 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rdx, qword[rbp + 4*8]
                       mov rbx, qword[rbp + 5*8]    
                       mov rax,[rdx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne " error_l "
+                      jne ERROR
                       mov rax,[rbx]
                       TYPE rax
                       cmp rax, T_INTEGER
-                      jne " error_l "
+                      jne ERROR
                       mov rax, [rdx]
                       DATA rax
-                      mov r8, rax
+                      mov r9, rax
+                      mov r8,rax
+                      cmp r8, 0
+                      jg .positive
+                      neg r8
+                      .positive:
+                      mov rax, r8
                       xor rdx, rdx
                       mov rbx, [rbx]
                       DATA rbx
-                      div rbx
-                      cmp r8, 0
+                      idiv rbx
+                      cmp r9, 0
                       jg " positive "
                       neg rdx         
                       "positive":               
                       MAKE_INT rdx
                       test_malloc 8
                       mov [rax], rdx                          
-                      jmp " finish_l"             
-                      " error_l ":
-                      CLEAN_STACK
-                      jmp ERROR
-                      " finish_l ":
                       CLEAN_STACK
                       ret
                       " L ":
@@ -2089,6 +2097,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax,[rax]
                       TYPE rax
@@ -2122,6 +2135,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax,[rax]
                       TYPE rax
@@ -2155,6 +2173,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax,[rax]
                       TYPE rax
@@ -2187,6 +2210,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8] ;get first param
                       mov rbx, qword[rbp + 5*8] ;get secound param
                       cmp rax, rbx
@@ -2221,6 +2249,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       mov rbx,rax
@@ -2232,7 +2265,7 @@
                       jmp "finish_l "
                       " check-integer ":
                       cmp rax, T_INTEGER
-                      jne ERROR_NOT_NUMBER
+                      jne ERROR
                       mov rax, qword[rbp + 4*8] 
                       "finish_l ":     
                       CLEAN_STACK
@@ -2257,6 +2290,11 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       mov rbx,rax
@@ -2268,7 +2306,7 @@
                       jmp "finish_l "
                       " check-integer ":
                       cmp rax, T_INTEGER
-                      jne ERROR_NOT_NUMBER
+                      jne ERROR
                       mov rax, const_5 
                       "finish_l ":     
                       CLEAN_STACK
@@ -2292,11 +2330,16 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rbx, [rax]
                       TYPE rbx
                       cmp rbx,T_PAIR
-                      JNE ERROR_NOT_PAIR
+                      JNE ERROR
                       mov rbx, [rax]
                       packed_car rbx
                       mov rdx, qword[rbp + 5*8]
@@ -2323,11 +2366,16 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                          
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 2
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rbx, [rax]
                       TYPE rbx
                       cmp rbx,T_PAIR
-                      JNE ERROR_NOT_PAIR
+                      JNE ERROR
                       mov rbx, [rax]
                       packed_cdr rbx
                       mov rdx, qword[rbp + 5*8]
@@ -2355,12 +2403,17 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax, [rax]
                       mov rbx,rax
                       TYPE rax
                       cmp rax,T_PAIR
-                      JNE ERROR_NOT_PAIR
+                      JNE ERROR
                       mov rax,rbx
                       packed_car rax
                       CLEAN_STACK
@@ -2383,12 +2436,17 @@
                       " B ":
                       push rbp
                       mov rbp, rsp
+                      
+                      mov r8, qword[rbp + 3 * 8]
+                      cmp r8, 1
+                      jne ERROR
+                          
                       mov rax, qword[rbp + 4*8]
                       mov rax,[rax]
                       mov rbx,rax
                       TYPE rax
                       cmp rax,T_PAIR
-                      JNE ERROR_NOT_PAIR
+                      JNE ERROR
                       mov rax,rbx
                       packed_cdr rax
                       CLEAN_STACK
@@ -2449,8 +2507,6 @@
     		(no_duplicates_list  
        			(reverse (list->set  (reverse (append (list (void) '() #f #t 1 "ERROR") (split-consts init-consts '())))))))
       no_duplicates_list)))
-
-
 
 
 (define fvar-label
@@ -2519,7 +2575,7 @@
       (lambda (table lst addr)
        (if (null? lst) `(,table ,addr)
         (let ((type (get-const-type (car lst) table)))
-            (iter `(,@table (,(car lst) ,addr ,type)) (cdr lst) (make_const_label)))))))
+            (iter `(,@table (,(car lst) ,(if (symbol? (car lst)) (caddr type) addr) ,type)) (cdr lst) (make_const_label)))))))
       (iter '() const-lst (make_const_label)))))
 
 (define string-join
@@ -2561,8 +2617,6 @@
            (string-append "
                           "bucket_label ":
                           	dq MAKE_SYMBOL_BUCKET("sym_string","next_bucket")
-                          "addr ":
-                          	dq MAKE_LITERAL_SYMBOL(" bucket_label ")
                           ")))
           
       (else "WTF"))
@@ -2670,6 +2724,10 @@
             (code-gen-box-get expr major ctable ftable))
        ((eq? 'box-set (car expr))
             (code-gen-box-set expr major ctable ftable))
+       (else 
+         (string-append "
+                        jmp ERROR
+                        "))
   )))
 
 
@@ -2735,13 +2793,14 @@
   
   (define code-gen-fvar
       (lambda (expr major ctable ftable)
-        (format "mov rax,qword[~A]
+        (format "
+                mov rax,qword[~A]
                 " (lookup-fvar (cadr expr) ftable))))
 
   (define code-gen-pvar
         (lambda (expr major ctable ftable)
             (let ((minor (caddr expr)))
-                    (format "mov rax, [rbp + (4+~A) * 8]" minor))))
+                    (format "mov rax, [rbp + (4+~A) * 8]\n" minor))))
                     
   (define code-gen-bvar
         (lambda (expr major ctable ftable)
@@ -2790,7 +2849,7 @@
                         cmp rdi, " (number->string major) "
                         je " loop_exit1 " 
                         mov r10, [rax + rdi*8]              ;; for(i=0;i<m;i++)
-                        mov [rbx + rdi*8 + 1*8], r10        ;;  env'[i+1] = env[i]    
+                        mov [rbx + rdi*8 + 1*8], r10        ;;  newenv[i+1] = env[i]    
                         inc rdi
                         jmp " loop_enter1 "
                         " loop_exit1 ":
@@ -2823,6 +2882,9 @@
                     " B ":
                     push rbp
                     mov rbp, rsp
+                    mov r8, qword[rbp+8*3]
+                    cmp r8," (number->string (length (cadr expr))) "
+                    jne ERROR    
                     " (code-gen (caddr expr) (+ 1 major) ctable ftable) "
                     CLEAN_STACK
                     ret
@@ -2904,6 +2966,7 @@
                     " loop_enter ":
                     cmp rsi, 0
                     je " loop_exit "
+                    push const_2
                     push rax
                     mov rax, rsi
                     shl rax,3
@@ -2912,7 +2975,7 @@
                     mov rax, qword[rbp + r10]
                     push rax
                     mov rax, [" cons-label "]
-                    CALL_LIB_FUN rax, 1                    
+                    CALL_LIB_FUN rax, 2                    
                     dec rsi
                     jmp " loop_enter "
                     " loop_exit ":
@@ -2947,7 +3010,7 @@
                                     mov rbx, rax
                                     TYPE rax
                                     cmp rax, T_CLOSURE
-                                    JNE ERROR_NOT_CLOSURE
+                                    JNE ERROR
                                     mov rax, rbx
                                     CLOSURE_ENV rbx
                                     push rbx
@@ -2979,7 +3042,7 @@
                                     mov rbx, rax
                                     TYPE rax
                                     cmp rax, T_CLOSURE
-                                    JNE ERROR_NOT_CLOSURE
+                                    JNE ERROR
                                     mov rax, rbx
                                     CLOSURE_ENV rbx
                                     push rbx             
@@ -3108,7 +3171,7 @@
           	\tmain:
                 mov qword[bucket_head],~A
                 mov rax, malloc_pointer
-				mov qword [rax], start_of_data2
+				        mov qword [rax], start_of_data2
                 ~A
                 push const_2
                 mov rax, 0
@@ -3121,22 +3184,12 @@
           	    mov rbp, rsp
                 ~A
                 jmp END
-                ERROR_NOT_CHAR:
-                   add rsp, 8 ;clean return addr
-                   jmp END
-                ERROR_NOT_CLOSURE:
-                   add rsp, 8 ;clean return 
-                   jmp END
-                ERROR_NOT_PAIR:
-                   add rsp, 8 ;clean return addr
-                   jmp END
-                ERROR_NOT_NUMBER:
-                   add rsp, 8 ;clean return addr
-                   jmp END
                 ERROR:
                    push const_6
                    call write_sob_if_not_void
-                   add rsp, 16 ;clean error msg + return addr
+                   add rsp, 8
+                   mov rdi, -1
+                   call exit
                    jmp END
                 END:
                 add rsp, 5*8
@@ -3146,5 +3199,5 @@
       		
   			
      		 (string->file asm-output out)
-        		(display asm-output)
+        	;	(display asm-output)
          )))                

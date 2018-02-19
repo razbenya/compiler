@@ -37,17 +37,13 @@
 	sar %1, TYPE_BITS
 %endmacro
 
-%macro GET_SYMBOL_BUCKET 1
-	sar %1, TYPE_BITS
-	add %1, start_of_data
-%endmacro
 
 %macro DATA_UPPER 1
-	sar %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS)
+	shr %1, (((WORD_SIZE - TYPE_BITS) >> 1) + TYPE_BITS)
 %endmacro
 
 %macro DATA_LOWER 1
-	sal %1, ((WORD_SIZE - TYPE_BITS) >> 1)
+	shl %1, ((WORD_SIZE - TYPE_BITS) >> 1)
 	DATA_UPPER %1
 %endmacro
 
@@ -55,11 +51,6 @@
 
 %define MAKE_LITERAL_SYMBOL(bucket) (((bucket - start_of_data) << TYPE_BITS) | T_SYMBOL)
 
-%macro MAKE_SYMBOL 1
-	sub %1, start_of_data
-	shl %1, TYPE_BITS
-	OR %1, T_SYMBOL
-%endmacro
 
 
 %define MAKE_LITERAL_FRACTION(numerator, denominator) (((((numerator - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (denominator - start_of_data)) << TYPE_BITS) | T_FRACTION)
@@ -330,7 +321,7 @@
 	or %1, T_PAIR
 %endmacro
 
-%define MAKE_SYMBOL_BUCKET(str, last) (((((str - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (last - start_of_data)) << TYPE_BITS) | T_BUCKET)
+%define MAKE_SYMBOL_BUCKET(str, last) (((((str - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (last - start_of_data)) << TYPE_BITS) | T_SYMBOL)
 
 %macro MAKE_BUCKET 2
 	sub %1, start_of_data
@@ -338,7 +329,7 @@
 	sub %2, start_of_data
 	shl %2, TYPE_BITS
 	or %1, %2
-	or %1, T_BUCKET
+	or %1, T_SYMBOL
 %endmacro
 
 %macro packed_car 1
@@ -494,7 +485,7 @@
 	VECTOR_ELEMENTS %1
 	lea %1, [%1 + %3*8]
 	mov %1, qword [%1]
-	mov %1, qword [%1]
+	;mov %1, qword [%1]
 %endmacro
 
 %define SOB_UNDEFINED MAKE_LITERAL(T_UNDEFINED, 0)
@@ -513,86 +504,16 @@ a:
 b:
 	dq 0
 
-sobNil:
-	dq SOB_NIL
-sobInt3:
-	dq MAKE_LITERAL(T_INTEGER, 3)
-sobInt2:
-	dq MAKE_LITERAL(T_INTEGER, 2)
-sobInt1:
-	dq MAKE_LITERAL(T_INTEGER, 1)
-sobPair3N:
-	dq MAKE_LITERAL_PAIR(sobInt3, sobNil)
-sobPair23N:
-	dq MAKE_LITERAL_PAIR(sobInt2, sobPair3N)
-sobPair123N:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobPair23N)
-sobPair12:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobInt2)
-sobPairA:
-	dq MAKE_LITERAL_PAIR(sobPair12, sobNil)
-sobPairB:
-	dq MAKE_LITERAL_PAIR(sobPair123N, sobPairA)
-sobPairC:
-	dq MAKE_LITERAL_PAIR(sobInt3, sobPair12)
-sobPairNN:
-	dq MAKE_LITERAL_PAIR(sobNil, sobNil)
-sob1:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobPairNN)
-sob2:
-	dq MAKE_LITERAL_PAIR(sobInt2, sob1)
-sob3:
-	dq MAKE_LITERAL_PAIR(sob2, sob2)
-sob4:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobNil)
-sob5:
-	dq MAKE_LITERAL_PAIR(sob4, sobNil)
-sob6:
-	dq 0, 0 		; closure: wait for later!
-sob7:
-	MAKE_LITERAL_STRING "Mayer", CHAR_NEWLINE, "Goldberg", CHAR_TAB, "<=="
-sob8:
-	dq MAKE_LITERAL_PAIR(sob7, sobPairB)
-sobVec1:
-	MAKE_LITERAL_VECTOR sob8, sob7, sobInt1, sobInt2, sobInt3, sob4 
-
 section .bss
-
 malloc_pointer:
 		resq 1
 start_of_data2:
 		resb gigabyte(1)
 
 extern exit, printf, scanf, malloc
-global _main, write_sob, write_sob_if_not_void
+global write_sob, write_sob_if_not_void
 section .text
-_main:
-	nop
-	; setup a fake closure just to see how it prints:
-	mov rax, 0x1234
-	sal rax, 30
-	or rax, sob6 + 8 - start_of_data
-	sal rax, 4
-	or rax, T_CLOSURE
-	mov qword [sob6], rax
-	mov qword [sob6 + 8], main
 
-	; printing the fake closure:	
-	push qword [sob6]
-	call write_sob_if_not_void
-	add rsp, 1*8
-
-	; printing a vector:
-	push qword [sobVec1]
-	call write_sob_if_not_void
-	add rsp, 1*8
-
-	; will void print??
-	push qword SOB_VOID
-	call write_sob_if_not_void
-	add rsp, 1*8
-	
-	ret
 
 write_sob_undefined:
 	push rbp
@@ -704,7 +625,7 @@ section .data
 .nul:
 	db "#\nul", 0
 .special:
-	db "#\x%02x", 0
+	db "#\x%x", 0
 .regular:
 	db "#\%c", 0
 
@@ -998,9 +919,7 @@ section	.data
 write_sob_symbol:
 	push rbp
 	mov rbp, rsp
-	mov rax, qword[rbp +8 + 1*8]
-	GET_SYMBOL_BUCKET rax
-	mov rax, [rax]
+	mov rax, qword[rbp +8 + 1*8]	
 	CAR rax
 	mov rcx, rax
 	STRING_LENGTH rcx
