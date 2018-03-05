@@ -1,5 +1,5 @@
-1. Dotan Marcus 302822119
-2. Raz ben-yaish 305438053
+1. Dotan Marcus
+2. Raz ben-yaish
 
 
 I (We) assert that the work we submitted is 100% our own. We have not received any
